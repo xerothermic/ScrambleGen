@@ -8,10 +8,10 @@
     /* standard cube sticker colors */
     --U: #ffffff;
     --D: #ffd500;
-    --F: #009e60;
+    --F: #30d158;
     --B: #0051ba;
     --L: #ff5800;
-    --R: #c8102e;
+    --R: #ff3b30;
     --accent: #30d158;          /* system green */
     --secondary: #8e8e93;       /* watchOS secondary label */
     --screen-w: 368px;          /* Apple Watch SE 44mm */
@@ -320,7 +320,7 @@ const SCRAMBLE = "R U R' U' F2 L D' B R2 U' F L' B2 D R' U2 L2 F' D2 B'".split("
     ["L","F","R","B"],
     [null,"D",null,null],
   ];
-  const root = document.createElement("div");
+  const net = document.getElementById("net");
   for (const r of layout) {
     const rowEl = document.createElement("div");
     rowEl.className = "netrow";
@@ -338,10 +338,8 @@ const SCRAMBLE = "R U R' U' F2 L D' B R2 U' F L' B2 D R' U2 L2 F' D2 B'".split("
       }
       rowEl.appendChild(faceEl);
     }
-    root.appendChild(rowEl);
+    net.appendChild(rowEl);
   }
-  const net = document.getElementById("net");
-  net.appendChild(root);
   document.getElementById("netcap").textContent = SCRAMBLE.length + " moves applied";
 
   /* expose a self-check for the screenshot script */
