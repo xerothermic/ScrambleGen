@@ -19,13 +19,22 @@ private struct ScrambleScreen: View {
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
     @FocusState private var lengthFocused: Bool
 
+    /// Group moves into fixed-width rows so the wrap doesn't shift based on
+    /// which moves happen to be 1 vs 2 chars wide.
+    private var scrambleRows: String {
+        stride(from: 0, to: moves.count, by: 5)
+            .map { moves[$0..<min($0 + 5, moves.count)].joined(separator: "  ") }
+            .joined(separator: "\n")
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    Text(moves.joined(separator: "  "))
-                        .font(.system(.headline, design: .monospaced))
+                    Text(scrambleRows)
+                        .font(.system(size: 19, weight: .semibold, design: .monospaced))
                         .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
 
@@ -40,7 +49,9 @@ private struct ScrambleScreen: View {
                                   : "dial.medium")
                             Text("Length \(length)")
                         }
+                        .font(.system(size: 16, weight: .medium))
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 2)
                     }
                     .buttonStyle(.bordered)
                     .tint(lengthFocused ? Color.accentColor : Color.gray)
@@ -63,7 +74,9 @@ private struct ScrambleScreen: View {
                         lengthFocused = false
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
+                            .font(.system(size: 17, weight: .semibold))
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 3)
                     }
                     .buttonStyle(.borderedProminent)
 
