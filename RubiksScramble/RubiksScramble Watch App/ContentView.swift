@@ -31,6 +31,13 @@ private struct ScrambleScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
+                    Text("\(moves.count) moves")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.accentColor))
+
                     Text(scrambleRows)
                         .font(.system(size: 19, weight: .semibold, design: .monospaced))
                         .multilineTextAlignment(.center)

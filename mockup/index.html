@@ -222,6 +222,20 @@
     color: var(--secondary);
     font-size: 11px;
   }
+
+  /* Top-of-screen count pill — analogous to "20 moves applied" on the
+     cube screen, but emphasized in accent green so it reads at a glance. */
+  .movecount {
+    align-self: center;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 999px;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+  }
 </style>
 </head>
 <body>
@@ -234,6 +248,7 @@
       <div class="statusbar"><span class="time">10:09</span></div>
       <div class="navtitle">Scramble</div>
       <div class="content">
+        <div class="movecount">20 moves</div>
         <div class="scramble" id="scrambleText"></div>
 
         <button class="lengthpill">
@@ -277,6 +292,7 @@
       <div class="statusbar"><span class="time">10:09</span></div>
       <div class="navtitle">Scramble</div>
       <div class="content">
+        <div class="movecount">20 moves</div>
         <div class="scramble"></div>
 
         <button class="lengthpill active">
