@@ -31,7 +31,9 @@ private struct ScrambleScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    Text("\(moves.count) moves")
+                    // Standard WCA scrambling orientation reminder. The green
+                    // pill + white text echo the two reference faces.
+                    Text("White top · Green front")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
