@@ -25,6 +25,9 @@ if (!allNine || !check.centersOk) {
 await page.locator("#screen-scramble").screenshot({
   path: join(here, "scramble.png"), omitBackground: true,
 });
+await page.locator("#screen-scramble-focused").screenshot({
+  path: join(here, "scramble-focused.png"), omitBackground: true,
+});
 await page.locator("#screen-cube").screenshot({
   path: join(here, "cube.png"), omitBackground: true,
 });
@@ -32,5 +35,5 @@ await page.locator("#stage").screenshot({
   path: join(here, "both.png"), omitBackground: true,
 });
 
-console.log("wrote scramble.png, cube.png, both.png");
+console.log("wrote scramble.png, scramble-focused.png, cube.png, both.png");
 await browser.close();
