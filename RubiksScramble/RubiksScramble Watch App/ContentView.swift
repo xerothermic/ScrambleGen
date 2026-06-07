@@ -16,6 +16,8 @@ struct ContentView: View {
 private struct ScrambleScreen: View {
     @Binding var length: Int
     @Binding var moves: [String]
+    @State private var crownLength = Double(ScrambleGenerator.defaultLength)
+    @FocusState private var lengthFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -27,14 +29,38 @@ private struct ScrambleScreen: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
 
-                    Stepper(value: $length, in: 1...50) {
-                        Text("Length: \(length)")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                    // Tap to capture the crown for adjusting length;
+                    // tap again to release it back to page navigation.
+                    Button {
+                        lengthFocused.toggle()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: lengthFocused
+                                  ? "checkmark.circle.fill"
+                                  : "dial.medium")
+                            Text("Length \(length)")
+                        }
+                        .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.bordered)
+                    .tint(lengthFocused ? Color.accentColor : Color.gray)
+                    .focusable()
+                    .focused($lengthFocused)
+                    .digitalCrownRotation(
+                        $crownLength,
+                        from: 1.0, through: 50.0, by: 1.0,
+                        sensitivity: .medium,
+                        isContinuous: false,
+                        isHapticFeedbackEnabled: true
+                    )
+                    .onChange(of: crownLength) { _, v in
+                        length = Int(v.rounded())
+                    }
+                    .onAppear { crownLength = Double(length) }
 
                     Button {
                         moves = ScrambleGenerator.generate(length: length)
+                        lengthFocused = false
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
                             .frame(maxWidth: .infinity)
