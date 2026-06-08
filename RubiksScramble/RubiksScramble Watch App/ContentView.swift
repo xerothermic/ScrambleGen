@@ -55,17 +55,14 @@ private struct ScrambleScreen: View {
                         .contentShape(Rectangle())
                         .onTapGesture { lengthFocused = false }
 
-                    // Crown-capture toggle. We avoid Button on purpose: on
-                    // watchOS, tapping a Button moves focus to it *and* runs
-                    // its action, so a `.focused($state)` binding gets set to
-                    // true by the focus event and then immediately toggled
-                    // back to false by the action — making activation
-                    // impossible. A plain `.focusable()` HStack with
-                    // `.onTapGesture` doesn't grab focus on tap, so the
-                    // explicit toggle works.
+                    // Crown-capture pill. Each tap target is one-directional
+                    // so there's no toggle race: tap the pill to ACTIVATE
+                    // (sets focus true), tap the scramble notation above to
+                    // DEACTIVATE. No Button — on watchOS, Button taps move
+                    // focus to themselves and would fight with our binding.
                     HStack(spacing: 6) {
                         Image(systemName: lengthFocused
-                              ? "checkmark.circle.fill"
+                              ? "dial.medium.fill"
                               : "dial.medium")
                         Text("Length \(length)")
                     }
@@ -83,7 +80,7 @@ private struct ScrambleScreen: View {
                     .focusable()
                     .focused($lengthFocused)
                     .onTapGesture {
-                        lengthFocused.toggle()
+                        lengthFocused = true
                     }
                     .sensoryFeedback(.selection, trigger: lengthFocused)
                     .digitalCrownRotation(
