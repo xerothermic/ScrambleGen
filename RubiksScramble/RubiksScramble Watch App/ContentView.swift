@@ -20,10 +20,13 @@ private struct ScrambleScreen: View {
     @FocusState private var lengthFocused: Bool
 
     /// Group moves into fixed-width rows so the wrap doesn't shift based on
-    /// which moves happen to be 1 vs 2 chars wide.
+    /// which moves happen to be 1 vs 2 chars wide. Each move is padded to a
+    /// uniform 2-char column so a row of all-2-char moves isn't wider than a
+    /// row of all-1-char moves, which is what made 5/row inconsistent before.
     private var scrambleRows: String {
-        stride(from: 0, to: moves.count, by: 5)
-            .map { moves[$0..<min($0 + 5, moves.count)].joined(separator: "  ") }
+        let padded = moves.map { $0.padding(toLength: 2, withPad: " ", startingAt: 0) }
+        return stride(from: 0, to: padded.count, by: 5)
+            .map { padded[$0..<min($0 + 5, padded.count)].joined(separator: " ") }
             .joined(separator: "\n")
     }
 
@@ -64,7 +67,6 @@ private struct ScrambleScreen: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(lengthFocused ? Color.accentColor : Color.gray)
-                    .focusable()
                     .focused($lengthFocused)
                     .digitalCrownRotation(
                         $crownLength,
