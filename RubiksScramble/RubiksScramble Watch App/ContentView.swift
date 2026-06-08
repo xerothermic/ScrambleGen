@@ -50,24 +50,37 @@ private struct ScrambleScreen: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
 
-                    // Tap to capture the crown for adjusting length;
-                    // tap again to release it back to page navigation.
-                    Button {
-                        lengthFocused.toggle()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: lengthFocused
-                                  ? "checkmark.circle.fill"
-                                  : "dial.medium")
-                            Text("Length \(length)")
-                        }
-                        .font(.system(size: 16, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 2)
+                    // Crown-capture toggle. We avoid Button on purpose: on
+                    // watchOS, tapping a Button moves focus to it *and* runs
+                    // its action, so a `.focused($state)` binding gets set to
+                    // true by the focus event and then immediately toggled
+                    // back to false by the action — making activation
+                    // impossible. A plain `.focusable()` HStack with
+                    // `.onTapGesture` doesn't grab focus on tap, so the
+                    // explicit toggle works.
+                    HStack(spacing: 6) {
+                        Image(systemName: lengthFocused
+                              ? "checkmark.circle.fill"
+                              : "dial.medium")
+                        Text("Length \(length)")
                     }
-                    .buttonStyle(.bordered)
-                    .tint(lengthFocused ? Color.accentColor : Color.gray)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(lengthFocused ? Color.black : Color.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .padding(.horizontal, 14)
+                    .background(
+                        Capsule().fill(lengthFocused
+                                       ? Color.accentColor
+                                       : Color.gray.opacity(0.30))
+                    )
+                    .contentShape(Capsule())
+                    .focusable()
                     .focused($lengthFocused)
+                    .onTapGesture {
+                        lengthFocused.toggle()
+                    }
+                    .sensoryFeedback(.selection, trigger: lengthFocused)
                     .digitalCrownRotation(
                         $crownLength,
                         from: 1.0, through: 50.0, by: 1.0,
