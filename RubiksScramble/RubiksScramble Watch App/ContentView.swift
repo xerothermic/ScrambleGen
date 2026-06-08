@@ -17,7 +17,13 @@ private struct ScrambleScreen: View {
     @Binding var length: Int
     @Binding var moves: [String]
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
-    @FocusState private var lengthFocused: Bool
+    // Enum-based focus so `focus = nil` *explicitly* means "no field
+    // focused" — a Bool `false` lets SwiftUI auto-restore focus to the
+    // only focusable on the page (the length pill), which is what caused
+    // tapping the notation to re-activate the pill.
+    private enum FocusField: Hashable { case length }
+    @FocusState private var focus: FocusField?
+    private var lengthFocused: Bool { focus == .length }
 
     /// Group moves into fixed-width rows so the wrap doesn't shift based on
     /// which moves happen to be 1 vs 2 chars wide. Each move is padded to a
@@ -53,7 +59,7 @@ private struct ScrambleScreen: View {
                         // a reliable dismiss path if the pill's own toggle
                         // misbehaves.
                         .contentShape(Rectangle())
-                        .onTapGesture { lengthFocused = false }
+                        .onTapGesture { focus = nil }
 
                     // Crown-capture pill. Each tap target is one-directional
                     // so there's no toggle race: tap the pill to ACTIVATE
@@ -78,11 +84,9 @@ private struct ScrambleScreen: View {
                     )
                     .contentShape(Capsule())
                     .focusable()
-                    .focused($lengthFocused)
-                    .onTapGesture {
-                        lengthFocused = true
-                    }
-                    .sensoryFeedback(.selection, trigger: lengthFocused)
+                    .focused($focus, equals: .length)
+                    .onTapGesture { focus = .length }
+                    .sensoryFeedback(.selection, trigger: focus)
                     .digitalCrownRotation(
                         $crownLength,
                         from: 1.0, through: 50.0, by: 1.0,
@@ -97,7 +101,7 @@ private struct ScrambleScreen: View {
 
                     Button {
                         moves = ScrambleGenerator.generate(length: length)
-                        lengthFocused = false
+                        focus = nil
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
                             .font(.system(size: 17, weight: .semibold))
