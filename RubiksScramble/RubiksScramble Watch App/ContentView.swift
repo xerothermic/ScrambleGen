@@ -49,6 +49,11 @@ private struct ScrambleScreen: View {
                         .minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
+                        // Tap the scramble itself to release crown focus —
+                        // a reliable dismiss path if the pill's own toggle
+                        // misbehaves.
+                        .contentShape(Rectangle())
+                        .onTapGesture { lengthFocused = false }
 
                     // Crown-capture toggle. We avoid Button on purpose: on
                     // watchOS, tapping a Button moves focus to it *and* runs
