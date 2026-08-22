@@ -181,6 +181,9 @@ else
     # Ship the installer too, so the target can seed the next repo and the
     # links in its copy of TESTFLIGHT.md resolve.
     copy_in Tools/install-testflight-pipeline.sh
+    # Runbook for a Claude Code session on the user's Mac, where the keychain
+    # and Xcode are. Auto-discovered there as /testflight-setup.
+    copy_in .claude/skills/testflight-setup/SKILL.md
 
     if [ -e "$TARGET/ci/release.config" ] && [ "$FORCE" -eq 0 ]; then
         echo "  skip    ci/release.config (exists; --force to overwrite)"
