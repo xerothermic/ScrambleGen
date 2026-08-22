@@ -37,3 +37,5 @@ Gesture model — strictly one-direction, no toggles:
 ## Distribution
 - Bundle ID placeholder is `com.example.RubiksScramble`; user replaces with their own team's reverse-DNS ID before App Store Connect submission.
 - App icon: starter at `RubiksScramble/RubiksScramble Watch App/Assets.xcassets/AppIcon.appiconset/icon.png`. Xcode strips the alpha during build, so the rendered PNG is fine as-is for upload.
+- TestFlight pipeline: `.github/workflows/testflight.yml`, run from the Actions tab or by pushing a `v*` tag. Per-repo settings are in `ci/release.config`; account setup, the six required repository secrets and troubleshooting are in `docs/TESTFLIGHT.md`. **No secrets are configured yet**, so the workflow currently fails its preflight.
+- The scheme is shared and committed under `RubiksScramble.xcodeproj/xcshareddata/xcschemes/`. Do not rely on Xcode's autocreated schemes — they live in `xcuserdata/` and CI never sees them.
