@@ -166,6 +166,8 @@ jobs:
         env:
           APPLE_DIST_CERT_P12: ${{ secrets.APPLE_DIST_CERT_P12 }}
           APPLE_DIST_CERT_PASSWORD: ${{ secrets.APPLE_DIST_CERT_PASSWORD }}
+          APPLE_DEV_CERT_P12: ${{ secrets.APPLE_DEV_CERT_P12 }}
+          APPLE_DEV_CERT_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
         run: |
           set -euo pipefail
           KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
@@ -181,6 +183,18 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security import "$CERT" -k "$KEYCHAIN" -P "$APPLE_DIST_CERT_PASSWORD" \
             -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          # Optional persistent development identity. Without one, automatic
+          # signing mints a throwaway "Apple Development: Created via API"
+          # certificate on every run — runners are ephemeral, so the account
+          # eventually hits Apple's certificate cap. See docs/TESTFLIGHT.md.
+          if [ -n "${APPLE_DEV_CERT_P12:-}" ]; then
+            DEV_CERT="$RUNNER_TEMP/dev.p12"
+            echo "$APPLE_DEV_CERT_P12" | base64 --decode > "$DEV_CERT"
+            security import "$DEV_CERT" -k "$KEYCHAIN" \
+              -P "${APPLE_DEV_CERT_PASSWORD:-$APPLE_DIST_CERT_PASSWORD}" \
+              -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+            rm -f "$DEV_CERT"
+          fi
           # Without this, codesign prompts for keychain access and hangs.
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
