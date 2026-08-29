@@ -34,6 +34,11 @@ Gesture model — strictly one-direction, no toggles:
 - Tap scramble notation → `focus = nil` (release).
 - Tap New Scramble → `focus = nil` + regenerate.
 
-## Distribution
-- Bundle ID placeholder is `com.example.RubiksScramble`; user replaces with their own team's reverse-DNS ID before App Store Connect submission.
-- App icon: starter at `RubiksScramble/RubiksScramble Watch App/Assets.xcassets/AppIcon.appiconset/icon.png`. Xcode strips the alpha during build, so the rendered PNG is fine as-is for upload.
+## Distribution (TestFlight via CI, ported from xerothermic/GoWatch)
+- **Ships as "CubeScramble"** — "Rubik's" is a live trademark, so display names and the App Store Connect record avoid it.
+- **iOS host wrapper is mandatory**: Xcode has no App Store distribution method for a bare watchOS archive, so the watch app ships embedded in the `CubeScramble` iPhone target (`RubiksScramble/CubeScramble iOS/`). Host = iPhone-only (`TARGETED_DEVICE_FAMILY = 1`, avoids ASC error 90474). Watch target keeps `SKIP_INSTALL = YES` (correct ONLY because it's embedded) and `WKRunsIndependentlyOfCompanionApp = YES` so it still installs/runs standalone.
+- Bundle IDs: host `com.cubescramble.CubeScramble` (parent — this is what the ASC app record binds to), watch `com.cubescramble.CubeScramble.watchkitapp`.
+- CI: `.github/workflows/testflight.yml` (repo-agnostic; per-repo values in `ci/release.config`). Archives shared scheme `CubeScramble` for `PLATFORM=iOS` on a `macos-26` runner and uploads to App Store Connect.
+- **Seven** GitHub Actions secrets required, not six: `APPLE_TEAM_ID`, `APPLE_DIST_CERT_P12`, `APPLE_DIST_CERT_PASSWORD`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`, plus `APPLE_PROVISIONING_PROFILES` (base64 tar.gz of the App Store `.mobileprovision` files — per-app, this repo needs its OWN profiles, named exactly "CubeScramble App Store" / "CubeScramble Watch App Store" to match `PROVISIONING_PROFILES` in the config).
+- Named profiles + `Apple Distribution` cert are deliberate: cloud signing fails with a Developer-role ASC key ("Cloud signing permission error").
+- App icons: 1024 RGB (no alpha) PNGs already in both targets' `AppIcon.appiconset` — an empty icon set passes the build and fails Apple validation ~20 min later.

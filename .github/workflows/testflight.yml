@@ -33,7 +33,7 @@ on:
     # fall back to workflow_dispatch if that gets tight.
     branches:
       - main
-      - claude/apple-watch-go-game-QaYSQ
+      - claude/rubiks-scramble-watchos-Q6X15
     tags:
       - 'v*'
 
