@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Export options for the TestFlight release workflow.
+
+  `teamID` is a placeholder: .github/workflows/testflight.yml copies this
+  file into the runner's temp dir and rewrites teamID from the
+  APPLE_TEAM_ID secret before use, so the real ID never lands in git.
+  The same workflow makes a second copy with `destination` flipped to
+  `upload` to hand the archive straight to App Store Connect.
+-->
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+
+	<key>destination</key>
+	<string>export</string>
+
+	<key>teamID</key>
+	<string>REPLACED_AT_BUILD_TIME</string>
+
+	<key>signingStyle</key>
+	<string>automatic</string>
+
+	<!-- Ship dSYMs so App Store Connect can symbolicate tester crash logs. -->
+	<key>uploadSymbols</key>
+	<true/>
+
+	<!-- The workflow sets MARKETING_VERSION / CURRENT_PROJECT_VERSION on the
+	     xcodebuild command line. Leave this false so Xcode doesn't quietly
+	     pick its own build number instead. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

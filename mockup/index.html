@@ -118,30 +118,43 @@
   /* ---- scramble screen ---- */
   .scramble {
     font-family: "SF Mono", ui-monospace, "DejaVu Sans Mono", Menlo, monospace;
-    font-size: 19px;
-    line-height: 1.5;
+    font-size: 22px;
+    line-height: 1.4;
     letter-spacing: 0.5px;
     text-align: center;
     font-weight: 600;
     padding: 6px 2px 12px;
   }
 
-  .stepper {
+  /* Length pill: tap once to capture the Digital Crown, tap again to release. */
+  .lengthpill {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    background: #1c1c1e;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    background: rgba(120,120,128,0.20);
+    color: #fff;
+    border: none;
     border-radius: 22px;
-    padding: 7px 8px 7px 16px;
+    padding: 12px 14px;
+    font-size: 16px;
+    font-weight: 500;
     margin-bottom: 10px;
+    font-family: inherit;
   }
-  .stepper .label { font-size: 15px; color: #fff; }
-  .stepper .ctrls { display: flex; gap: 6px; }
-  .stepper .ctrls button {
-    width: 34px; height: 30px;
-    border: none; border-radius: 15px;
-    background: #3a3a3c; color: #fff;
-    font-size: 20px; line-height: 1; font-weight: 500;
+  .lengthpill svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .lengthpill.active {
+    background: var(--accent);
+    color: #003912;
+  }
+  /* Subtle green glow on the crown when the length pill is active, signalling
+     that the Digital Crown is now bound to this control. */
+  .watch.crown-active .crown {
+    background: linear-gradient(90deg, #51e07a, #2eb84a);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.4),
+      0 0 10px 2px rgba(48, 209, 88, 0.55);
   }
 
   .primary {
@@ -149,12 +162,12 @@
     width: 100%;
     background: var(--accent);
     color: #003912;
-    font-size: 16px; font-weight: 600;
+    font-size: 17px; font-weight: 600;
     border: none; border-radius: 22px;
-    padding: 12px 0;
+    padding: 14px 0;
     margin-bottom: 8px;
   }
-  .primary svg { width: 17px; height: 17px; }
+  .primary svg { width: 19px; height: 19px; }
 
   .hint {
     margin-top: auto;
@@ -196,7 +209,7 @@
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
     gap: 2px;
-    width: 72px; height: 72px;
+    width: 78px; height: 78px;
   }
   .face.empty { background: transparent; }
   .sticker {
@@ -208,6 +221,20 @@
     text-align: center;
     color: var(--secondary);
     font-size: 11px;
+  }
+
+  /* Top-of-screen count pill — analogous to "20 moves applied" on the
+     cube screen, but emphasized in accent green so it reads at a glance. */
+  .movecount {
+    align-self: center;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 999px;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
   }
 </style>
 </head>
@@ -221,18 +248,64 @@
       <div class="statusbar"><span class="time">10:09</span></div>
       <div class="navtitle">Scramble</div>
       <div class="content">
+        <div class="movecount">White top &middot; Green front</div>
         <div class="scramble" id="scrambleText"></div>
 
-        <div class="stepper">
-          <span class="label">Length 20</span>
-          <span class="ctrls">
-            <button>&minus;</button>
-            <button>+</button>
-          </span>
-        </div>
+        <button class="lengthpill">
+          <!-- dial.medium-style glyph -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="8"/>
+            <line x1="12" y1="4.5" x2="12" y2="8"/>
+          </svg>
+          <span>Length 20</span>
+        </button>
 
         <button class="primary">
           <!-- shuffle glyph -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="#003912" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h4l10 12h4"/><path d="M3 18h4l4-5"/>
+            <path d="M14 8l3-2 3 2"/><path d="M14 16l3 2 3-2"/>
+          </svg>
+          New Scramble
+        </button>
+
+        <div class="hint">
+          <span class="chev">
+            <svg viewBox="0 0 26 12" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3l10 6 10-6"/>
+            </svg>
+          </span>
+          <span class="caption">Cube map</span>
+        </div>
+      </div>
+      <div class="pagedots"><span class="dot on"></span><span class="dot"></span></div>
+    </div>
+  </div>
+
+  <!-- ===== Screen 1b: Scramble, length pill focused (crown active) ===== -->
+  <div class="watch crown-active" id="screen-scramble-focused">
+    <div class="crown"></div>
+    <div class="screen">
+      <div class="statusbar"><span class="time">10:09</span></div>
+      <div class="navtitle">Scramble</div>
+      <div class="content">
+        <div class="movecount">White top &middot; Green front</div>
+        <div class="scramble"></div>
+
+        <button class="lengthpill active">
+          <!-- dial.medium.fill-style glyph (filled disc with a tick mark) -->
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="8" fill="currentColor"/>
+            <line x1="12" y1="4.5" x2="12" y2="8"
+                  stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>Length 20</span>
+        </button>
+
+        <button class="primary">
           <svg viewBox="0 0 24 24" fill="none" stroke="#003912" stroke-width="2.2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h4l10 12h4"/><path d="M3 18h4l4-5"/>
@@ -306,9 +379,15 @@ const SCRAMBLE = "R U R' U' F2 L D' B R2 U' F L' B2 D R' U2 L2 F' D2 B'".split("
 /* render scramble text (kept on its own lines of ~5 moves for readability) */
 (function renderScramble(){
   const lines = [];
-  for (let i=0;i<SCRAMBLE.length;i+=5) lines.push(SCRAMBLE.slice(i,i+5).join("  "));
-  document.getElementById("scrambleText").textContent = lines.join("\n");
-  document.getElementById("scrambleText").style.whiteSpace = "pre-line";
+  // Pad 1-char moves to 2 chars so each move column has the same width;
+  // otherwise rows of mostly-2-char moves are wider and wrap on small watches.
+  const padded = SCRAMBLE.map(m => m.length < 2 ? m + " " : m);
+  for (let i=0;i<padded.length;i+=5) lines.push(padded.slice(i,i+5).join(" "));
+  const text = lines.join("\n");
+  document.querySelectorAll(".scramble").forEach(el => {
+    el.textContent = text;
+    el.style.whiteSpace = "pre";
+  });
 })();
 
 /* render the net */

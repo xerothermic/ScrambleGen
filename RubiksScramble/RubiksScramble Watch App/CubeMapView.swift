@@ -8,7 +8,7 @@ import SwiftUI
 struct CubeMapView: View {
     let moves: [String]
 
-    private let cell: CGFloat = 10
+    private let cell: CGFloat = 13
     private let stickerGap: CGFloat = 1
     private let faceGap: CGFloat = 3
 
@@ -47,7 +47,7 @@ struct CubeMapView: View {
             ForEach(0..<3, id: \.self) { r in
                 HStack(spacing: stickerGap) {
                     ForEach(0..<3, id: \.self) { c in
-                        RoundedRectangle(cornerRadius: 1.5)
+                        RoundedRectangle(cornerRadius: 2)
                             .fill(cube.color(face: face, row: r, col: c))
                             .frame(width: cell, height: cell)
                     }
