@@ -204,17 +204,17 @@ in Step 2 and keep CI runs for the real thing.
 
 ## This repo (CubeScramble) — specifics beyond the generic runbook
 
-- **Structure**: iOS host `CubeScramble` (bundle `com.cubescramble.CubeScramble`,
-  the ID the App Store Connect record must use, platform **iOS**) embeds the
-  watch app (`com.cubescramble.CubeScramble.watchkitapp`). The watch target's
+- **Structure**: iOS host `CubeScramble` (bundle `com.pcintaiwan.scramblegen`,
+  the ID the App Store Connect record is registered against, platform **iOS**)
+  embeds the watch app (`com.pcintaiwan.scramblegen.watch`). The watch target's
   `SKIP_INSTALL = YES` is CORRECT here — it's embedded; only the host must
   appear in `Products/Applications/`.
 - **Secrets are not six here.** `ci/release.config` sets
   `PROVISIONING_PROFILES`, so the workflow additionally REQUIRES
   `APPLE_PROVISIONING_PROFILES`: a base64 tar.gz of TWO App Store profiles
   created on developer.apple.com and named exactly
-  **"CubeScramble App Store"** (com.cubescramble.CubeScramble) and
-  **"CubeScramble Watch App Store"** (com.cubescramble.CubeScramble.watchkitapp):
+  **"ScrambleGen App Store"** (com.pcintaiwan.scramblegen) and
+  **"ScrambleGen Watch App Store"** (com.pcintaiwan.scramblegen.watch):
 
   ```sh
   tar czf profiles.tar.gz *.mobileprovision
