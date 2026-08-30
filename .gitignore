@@ -1,0 +1,14 @@
+# Xcode
+build/
+build-device/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.xcodeproj/project.xcworkspace/
+
+# macOS
+.DS_Store
+
+# Per-developer signing config (each contributor supplies their own)
+local.xcconfig

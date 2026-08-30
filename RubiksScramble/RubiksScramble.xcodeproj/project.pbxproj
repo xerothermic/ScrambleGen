@@ -347,10 +347,10 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "CubeScramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.cubescramble.CubeScramble";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.pcintaiwan.scramblegen";
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.cubescramble.CubeScramble.watchkitapp";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -373,10 +373,10 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "CubeScramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.cubescramble.CubeScramble";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.pcintaiwan.scramblegen";
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.cubescramble.CubeScramble.watchkitapp";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -402,7 +402,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.cubescramble.CubeScramble";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -426,7 +426,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.cubescramble.CubeScramble";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;

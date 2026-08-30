@@ -27,10 +27,10 @@ on:
         type: boolean
   push:
     # Every push to a working branch ships a build, so a change can be on
-    # the wrist a few minutes later. Note the cost: this repo is private,
-    # so macOS runner minutes bill at 10x and one upload is roughly 100
-    # minutes of the 2000-minute monthly allowance. Drop `branches` and
-    # fall back to workflow_dispatch if that gets tight.
+    # the wrist a few minutes later. This repo is public, so macOS runner
+    # minutes are free; a private one bills them at 10x and would want a
+    # narrower trigger. `on:` cannot read ci/release.config, so this
+    # branch list is edited by hand per repo.
     branches:
       - main
       - claude/rubiks-scramble-watchos-Q6X15
