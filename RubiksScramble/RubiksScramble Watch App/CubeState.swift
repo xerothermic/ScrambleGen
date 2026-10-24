@@ -66,7 +66,7 @@ struct CubeState {
     ]
 
     private mutating func turn(_ face: Character) {
-        let perm = Self.perms[face]!
+        guard let perm = Self.perms[face] else { return }
         facelets = perm.map { facelets[$0] }
     }
 
