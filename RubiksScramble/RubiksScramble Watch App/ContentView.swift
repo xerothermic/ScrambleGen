@@ -5,29 +5,54 @@ struct ContentView: View {
     @State private var lengths = Dictionary(
         uniqueKeysWithValues: Puzzle.allCases.map { ($0, $0.defaultLength) }
     )
-    @State private var moves: [String] = []
+    @State private var moves: [Puzzle: [String]] = [:]
 
     var body: some View {
-        TabView {
-            ScrambleScreen(puzzle: $puzzle, lengths: $lengths, moves: $moves)
-            // The net is a 3×3 cube state; Square-1 notation can't be applied to it.
-            if puzzle == .cube3x3 {
-                CubeMapView(moves: moves)
+        // Swipe left/right between puzzles; each puzzle pages vertically.
+        TabView(selection: $puzzle) {
+            ForEach(Puzzle.allCases) { option in
+                PuzzlePage(puzzle: option, selection: $puzzle,
+                           lengths: $lengths, moves: $moves)
+                    .tag(option)
             }
         }
-        .tabViewStyle(.verticalPage)
+        .tabViewStyle(.page)
         .onAppear {
-            if moves.isEmpty {
-                moves = puzzle.generate(length: lengths[puzzle] ?? puzzle.defaultLength)
+            for option in Puzzle.allCases where moves[option] == nil {
+                moves[option] = option.generate(
+                    length: lengths[option] ?? option.defaultLength)
             }
         }
     }
 }
 
-private struct ScrambleScreen: View {
-    @Binding var puzzle: Puzzle
+private struct PuzzlePage: View {
+    let puzzle: Puzzle
+    @Binding var selection: Puzzle
     @Binding var lengths: [Puzzle: Int]
-    @Binding var moves: [String]
+    @Binding var moves: [Puzzle: [String]]
+
+    var body: some View {
+        let screen = ScrambleScreen(puzzle: puzzle, selection: $selection,
+                                    lengths: $lengths, moves: $moves)
+        // The net is a 3×3 cube state; Square-1 notation can't be applied to it.
+        if puzzle == .cube3x3 {
+            TabView {
+                screen
+                CubeMapView(moves: moves[puzzle] ?? [])
+            }
+            .tabViewStyle(.verticalPage)
+        } else {
+            screen
+        }
+    }
+}
+
+private struct ScrambleScreen: View {
+    let puzzle: Puzzle
+    @Binding var selection: Puzzle
+    @Binding var lengths: [Puzzle: Int]
+    @Binding var moves: [Puzzle: [String]]
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
     // Enum-based focus so `focus = nil` *explicitly* means "no field
     // focused" — a Bool `false` lets SwiftUI auto-restore focus to the
@@ -45,28 +70,26 @@ private struct ScrambleScreen: View {
     /// and each row holds as many as fit across the smallest watch.
     private var scrambleRows: String {
         let (width, perRow) = puzzle == .cube3x3 ? (2, 5) : (8, 2)
-        let padded = moves.map { $0.padding(toLength: width, withPad: " ", startingAt: 0) }
+        let padded = (moves[puzzle] ?? []).map {
+            $0.padding(toLength: width, withPad: " ", startingAt: 0)
+        }
         return stride(from: 0, to: padded.count, by: perRow)
             .map { padded[$0..<min($0 + perRow, padded.count)].joined(separator: " ") }
             .joined(separator: "\n")
-    }
-
-    private func select(_ newPuzzle: Puzzle) {
-        guard newPuzzle != puzzle else { return }
-        focus = nil
-        puzzle = newPuzzle
-        let newLength = lengths[newPuzzle] ?? newPuzzle.defaultLength
-        crownLength = Double(newLength)
-        moves = newPuzzle.generate(length: newLength)
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
+                    // Shows which puzzle this page is; tapping the other one
+                    // pages over, same as swiping.
                     HStack(spacing: 6) {
                         ForEach(Puzzle.allCases) { option in
-                            Button { select(option) } label: {
+                            Button {
+                                focus = nil
+                                withAnimation { selection = option }
+                            } label: {
                                 Text(option.shortName)
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(option == puzzle ? Color.black : Color.white)
@@ -150,7 +173,7 @@ private struct ScrambleScreen: View {
                     .onAppear { crownLength = Double(length) }
 
                     Button {
-                        moves = puzzle.generate(length: length)
+                        moves[puzzle] = puzzle.generate(length: length)
                         focus = nil
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
@@ -174,6 +197,8 @@ private struct ScrambleScreen: View {
             }
             .navigationTitle("Scramble")
         }
+        // Swiping to the other puzzle shouldn't leave the crown bound here.
+        .onDisappear { focus = nil }
     }
 }
 
