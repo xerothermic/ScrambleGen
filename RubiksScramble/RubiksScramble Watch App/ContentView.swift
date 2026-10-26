@@ -6,16 +6,20 @@ struct ContentView: View {
         uniqueKeysWithValues: Puzzle.allCases.map { ($0, $0.defaultLength) }
     )
     @State private var moves: [Puzzle: [String]] = [:]
+    // Which vertical page (0 = scramble, 1 = map) each puzzle is showing.
+    @State private var pages: [Puzzle: Int] = [:]
 
     var body: some View {
         // Swipe left/right between puzzles; each puzzle pages vertically.
         TabView(selection: $puzzle) {
             ForEach(Puzzle.allCases) { option in
-                PuzzlePage(puzzle: option, lengths: $lengths, moves: $moves)
+                PuzzlePage(puzzle: option, lengths: $lengths, moves: $moves,
+                           page: Binding(get: { pages[option] ?? 0 },
+                                         set: { pages[option] = $0 }))
                     .tag(option)
             }
         }
-        .tabViewStyle(.page)
+        .tabViewStyle(.page(indexDisplayMode: pages[puzzle] == 1 ? .never : .automatic))
         .onAppear {
             for option in Puzzle.allCases where moves[option] == nil {
                 moves[option] = option.generate(
@@ -29,14 +33,16 @@ private struct PuzzlePage: View {
     let puzzle: Puzzle
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
+    @Binding var page: Int
 
     var body: some View {
         // Scramble on top; swipe down for the puzzle's state after it.
-        TabView {
+        TabView(selection: $page) {
             ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
+                .tag(0)
             switch puzzle {
-            case .cube3x3: CubeMapView(moves: moves[puzzle] ?? [])
-            case .square1: Square1MapView(moves: moves[puzzle] ?? [])
+            case .cube3x3: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
+            case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
             }
         }
         .tabViewStyle(.verticalPage)
