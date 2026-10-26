@@ -124,6 +124,19 @@ if [ -n "$PBXPROJ" ]; then
     done <<< "$(grep -o 'path = [^;]*\.xcconfig' "$PBXPROJ" | sed 's/path = //; s/"//g' | xargs -n1 basename 2>/dev/null | sort -u)"
 fi
 
+# Manual signing needs one App Store profile per bundle in the archive.
+# Propose "<bundle id> App Store" names; the profiles must be created on
+# developer.apple.com under exactly these names (or the config edited).
+PROVISIONING_PROFILES=""
+if [ -n "$PBXPROJ" ]; then
+    while IFS= read -r bid; do
+        [ -n "$bid" ] || continue
+        case "$bid" in *Tests|*tests|*UITests|*'$('*) continue ;; esac
+        PROVISIONING_PROFILES="${PROVISIONING_PROFILES:+$PROVISIONING_PROFILES;}$bid=$bid App Store"
+    done <<< "$(grep -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*' "$PBXPROJ" | sed 's/.*= //; s/"//g' | sort -u)"
+fi
+[ -n "$PROVISIONING_PROFILES" ] || blocker "No bundle IDs found; fill in PROVISIONING_PROFILES in ci/release.config by hand."
+
 # ------------------------------------------------------------------- checks
 
 while IFS= read -r iconset; do
@@ -214,6 +227,17 @@ TEAM_XCCONFIG="$TEAM_XCCONFIG"
 # Optional. Xcode 15.3+ wants "app-store-connect"; older Xcode wants
 # "app-store". Defaults to app-store-connect.
 EXPORT_METHOD="app-store-connect"
+
+# Required. Signing is manual for archive and export: this certificate
+# (APPLE_DIST_CERT_P12 secret) plus the App Store profiles below
+# (APPLE_PROVISIONING_PROFILES secret, base64 .tar.gz of .mobileprovision
+# files). CI never signs automatically, so it never creates certificates.
+SIGNING_CERTIFICATE="Apple Distribution"
+
+# Semicolon-separated <bundle-id>=<profile-name> pairs, one per bundle in
+# the archive. Names are proposals: create App Store profiles with exactly
+# these names on developer.apple.com, or edit them to match yours.
+PROVISIONING_PROFILES="$PROVISIONING_PROFILES"
 CONFIG
         echo "  wrote   ci/release.config"
     fi
@@ -224,7 +248,8 @@ fi
 echo
 echo "Detected:"
 printf '  %-16s %s\n' project "$XCODE_PROJECT" scheme "$XCODE_SCHEME" \
-                      platform "$PLATFORM" "team xcconfig" "${TEAM_XCCONFIG:-<none>}"
+                      platform "$PLATFORM" "team xcconfig" "${TEAM_XCCONFIG:-<none>}" \
+                      profiles "${PROVISIONING_PROFILES:-<none>}"
 
 if [ -n "$BLOCKERS" ]; then
     echo
@@ -242,9 +267,13 @@ cat <<'NEXT'
 
 Still to do by hand in the target repo (see its docs/TESTFLIGHT.md):
   · Create the App Store Connect app record on the right platform.
-  · Add the six repository secrets: APPLE_TEAM_ID, APPLE_DIST_CERT_P12,
-    APPLE_DIST_CERT_PASSWORD, ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY.
-    GitHub has no account-level Actions secrets, so every repo needs its
-    own copy — the same values work across all of them.
+  · Create one App Store provisioning profile per bundle, named as in
+    PROVISIONING_PROFILES in ci/release.config, with the Apple
+    Distribution certificate ticked.
+  · Add the seven repository secrets: APPLE_TEAM_ID, APPLE_DIST_CERT_P12,
+    APPLE_DIST_CERT_PASSWORD, ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY,
+    APPLE_PROVISIONING_PROFILES. GitHub has no account-level Actions
+    secrets, so every repo needs its own copy — all but the profiles are
+    the same across repos.
   · Run the workflow once with dry_run: true to prove signing works.
 NEXT

@@ -140,7 +140,10 @@ re-run `-exportArchive`. That uploads without involving CI at all.
 
 ## Step 3 — Set the GitHub secrets
 
-Six per repo. `gh` must be authenticated (`gh auth status`).
+Seven per repo (the seventh, `APPLE_PROVISIONING_PROFILES`, is in the
+repo-specific notes at the end and in `docs/TESTFLIGHT.md`). CI signs
+manually with the Apple Distribution certificate and App Store profiles
+only; it never needs or creates a development certificate. `gh` must be authenticated (`gh auth status`).
 
 ```sh
 REPO=<owner/name>
@@ -209,8 +212,7 @@ in Step 2 and keep CI runs for the real thing.
   embeds the watch app (`com.pcintaiwan.scramblegen.watch`). The watch target's
   `SKIP_INSTALL = YES` is CORRECT here — it's embedded; only the host must
   appear in `Products/Applications/`.
-- **Secrets are not six here.** `ci/release.config` sets
-  `PROVISIONING_PROFILES`, so the workflow additionally REQUIRES
+- **Seven secrets.** Like every repo on this pipeline, the workflow REQUIRES
   `APPLE_PROVISIONING_PROFILES`: a base64 tar.gz of TWO App Store profiles
   created on developer.apple.com and named exactly
   **"ScrambleGen App Store"** (com.pcintaiwan.scramblegen) and
@@ -221,10 +223,10 @@ in Step 2 and keep CI runs for the real thing.
   base64 -i profiles.tar.gz | gh secret set APPLE_PROVISIONING_PROFILES --repo "$REPO"
   ```
 
-- **Strongly recommended**: also set `APPLE_DEV_CERT_P12` (+
-  `APPLE_DEV_CERT_PASSWORD` if it differs from the dist password) — an
-  exported Apple Development cert+key. Without it every CI run mints a
-  throwaway development certificate until the Apple account hits its
-  certificate cap; GoWatch went red for three runs on exactly this. See the
-  troubleshooting table in `docs/TESTFLIGHT.md`.
+- Both profiles must include the Apple Distribution certificate held in
+  `APPLE_DIST_CERT_P12`. No development certificate is used: the archive is
+  manually signed and runs without `-allowProvisioningUpdates`, so CI never
+  mints "Apple Development: Created via API" certificates (the old automatic
+  archive did, until the account hit Apple's cap). `APPLE_DEV_CERT_P12` is
+  ignored if still set.
 - Register both bundle IDs under Identifiers before creating the profiles.

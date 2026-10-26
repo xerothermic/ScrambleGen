@@ -8,6 +8,10 @@
   APPLE_TEAM_ID secret before use, so the real ID never lands in git.
   The same workflow makes a second copy with `destination` flipped to
   `upload` to hand the archive straight to App Store Connect.
+
+  Signing is always manual: the workflow fills in signingCertificate and
+  provisioningProfiles from SIGNING_CERTIFICATE / PROVISIONING_PROFILES in
+  ci/release.config.
 -->
 <plist version="1.0">
 <dict>
@@ -21,7 +25,7 @@
 	<string>REPLACED_AT_BUILD_TIME</string>
 
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
 
 	<!-- Ship dSYMs so App Store Connect can symbolicate tester crash logs. -->
 	<key>uploadSymbols</key>

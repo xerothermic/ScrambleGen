@@ -15,10 +15,15 @@ xcodebuild -exportArchive (destination: upload)        → App Store Connect
 Apple processes the build (5–15 min) → appears in TestFlight
 ```
 
-Signing uses **automatic** style plus `-allowProvisioningUpdates`, so Xcode
-creates and refreshes the App Store provisioning profile itself through the
-App Store Connect API key. Only the distribution *certificate* has to be
-stored as a secret; no `.mobileprovision` file is ever committed or uploaded.
+Signing is **manual** for both archive and export: one persistent **Apple
+Distribution** certificate (`APPLE_DIST_CERT_P12`) and one **App Store**
+provisioning profile per bundle (`APPLE_PROVISIONING_PROFILES`), named in
+`ci/release.config`. No development certificate is involved, and the archive
+runs without `-allowProvisioningUpdates`, so CI cannot create certificates,
+profiles or App IDs on the developer portal. If something is missing it
+fails with a message naming the secret or profile, instead of quietly
+minting a throwaway certificate the way automatic signing did (until the
+account hit Apple's certificate cap). The API key is used only to upload.
 
 | File | Role |
 |---|---|
@@ -39,9 +44,9 @@ free personal team can sideload from Xcode but cannot upload builds.
 ### 2. Register the bundle ID
 
 In [developer.apple.com → Identifiers](https://developer.apple.com/account/resources/identifiers/list),
-register an App ID matching the target's `PRODUCT_BUNDLE_IDENTIFIER`.
-Automatic signing can create this for you the first time, but registering it
-by hand makes the first CI run less surprising.
+register an App ID for every bundle in the archive (the app, and an
+embedded watch app or extension). CI signs manually and never creates App
+IDs, so this is required: the App Store profiles are created against them.
 
 ### 3. Create the App Store Connect app record
 
@@ -107,9 +112,11 @@ Settings → Secrets and variables → Actions → **New repository secret**:
 | `ASC_KEY_ID` | Key ID from step 4 |
 | `ASC_ISSUER_ID` | Issuer ID from step 4 |
 | `ASC_PRIVATE_KEY` | **entire contents** of the `.p8`, including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines |
-| `APPLE_PROVISIONING_PROFILES` | base64 of a `.tar.gz` of the App Store `.mobileprovision` files — only when `ci/release.config` sets `PROVISIONING_PROFILES` |
-| `APPLE_DEV_CERT_P12` | base64 of an **Apple Development** cert+key `.p12` (export like step 5, but the *Apple Development* row). Optional but strongly recommended: the archive step signs automatically, and without a persistent development identity in the keychain it mints a fresh development certificate through the API key on **every run** — runners are ephemeral, so the key is lost each time and the account eventually hits Apple's certificate cap ("Choose a certificate to revoke"). |
-| `APPLE_DEV_CERT_PASSWORD` | password for `APPLE_DEV_CERT_P12`; falls back to `APPLE_DIST_CERT_PASSWORD` when unset |
+| `APPLE_PROVISIONING_PROFILES` | base64 of a `.tar.gz` of the App Store `.mobileprovision` files named in `PROVISIONING_PROFILES` (see below) |
+
+No development certificate secret is needed; `APPLE_DEV_CERT_P12` /
+`APPLE_DEV_CERT_PASSWORD`, if set from an earlier version of this pipeline,
+are ignored and can be deleted.
 
 > GitHub has **no account-level Actions secrets** for personal accounts, and
 > organization secrets need an organization. So every repo gets its own copy
@@ -117,38 +124,37 @@ Settings → Secrets and variables → Actions → **New repository secret**:
 > it's paste-once-per-repo, not set-up-again-per-repo. The profiles are the
 > exception: they are per-app.
 
-#### When you need `APPLE_PROVISIONING_PROFILES`
+#### The App Store profiles (`APPLE_PROVISIONING_PROFILES`)
 
-Leave `PROVISIONING_PROFILES` empty in `ci/release.config` and Xcode signs
-through the API key ("cloud signing"), with no profile secret to manage.
-That only works if the key may manage **distribution** assets. An App
-Manager key may not, and export fails with:
-
-```
-error: exportArchive Cloud signing permission error
-error: exportArchive No profiles for '<bundle id>' were found
-```
-
-Two ways out. Either re-create the API key with the **Admin** role, or name
-the profiles explicitly — which is what this repo does, because it also
-stops every run minting a fresh development certificate against the account's
-certificate cap.
-
-To build the secret, with one App Store profile per bundle in the archive
-(an embedded watch app needs its own — download them from
-[Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/profiles/list)):
+One profile per bundle in the archive — an embedded watch app needs its
+own. On [Certificates, Identifiers & Profiles → Profiles](https://developer.apple.com/account/resources/profiles/list)
+→ **+** → *Distribution* → **App Store Connect** → pick the App ID → tick the
+**Apple Distribution** certificate whose `.p12` is in `APPLE_DIST_CERT_P12`
+→ name it exactly as in `PROVISIONING_PROFILES` → **Generate** → **Download**.
 
 ```sh
 tar czf profiles.tar.gz *.mobileprovision
 base64 -i profiles.tar.gz | gh secret set APPLE_PROVISIONING_PROFILES --repo <owner>/<repo>
 ```
 
-Then list them in `ci/release.config`:
+and in `ci/release.config`:
 
 ```sh
 SIGNING_CERTIFICATE="Apple Distribution"
 PROVISIONING_PROFILES="com.example.App=App Store Profile;com.example.App.watchkitapp=Watch App Store Profile"
 ```
+
+The workflow's *Show and verify signing setup* step lists the identities and
+profiles it installed (names and UUIDs only) and fails before archiving if a
+named profile is missing, is not an App Store profile, is for another bundle
+or team, has expired, or does not include the imported certificate.
+
+Profiles are tied to the certificate. When the Apple Distribution
+certificate is renewed (it lasts a year), export the new `.p12` into
+`APPLE_DIST_CERT_P12`, edit each profile to tick the new certificate,
+re-download, and refresh `APPLE_PROVISIONING_PROFILES`. Profiles also expire
+after a year; same refresh. Adding a capability (App Groups, HealthKit, …)
+to a target also means regenerating its profile.
 
 Two optional **variables** (same page, *Variables* tab) tune the build:
 
@@ -251,6 +257,8 @@ unless you ask for `--force`.
 | `PLATFORM` | `watchOS` \| `iOS` \| `macOS` \| `visionOS` \| `tvOS`. Becomes `generic/platform=…`. |
 | `TEAM_XCCONFIG` | Optional. Gitignored xcconfig the project references for `DEVELOPMENT_TEAM`; CI writes it from `APPLE_TEAM_ID` and deletes it afterwards. Empty to skip. |
 | `EXPORT_METHOD` | Optional. `app-store-connect` (Xcode 15.3+) or `app-store` (older). |
+| `SIGNING_CERTIFICATE` | Required. `Apple Distribution`. |
+| `PROVISIONING_PROFILES` | Required. `<bundle-id>=<profile name>` pairs, `;`-separated, one per bundle in the archive. The installer proposes `<bundle-id> App Store` names. |
 
 ---
 
@@ -267,7 +275,11 @@ unless you ask for `--force`.
 | `Authentication credentials are missing or invalid` | `ASC_PRIVATE_KEY` is missing its BEGIN/END lines, or Key ID and Issuer ID are swapped. |
 | `The bundle version must be higher than the previously uploaded version` | Build number collision — raise `BUILD_NUMBER_OFFSET` or pass `build_number` explicitly. |
 | `Invalid App Store Icon` / `Missing app icon` | The `AppIcon.appiconset` has no image. Add a 1024x1024 PNG — opaque, square, no alpha and no rounded corners — and name it in `Contents.json`. (GoWatch generates its placeholder with `python3 Tools/make_app_icon.py`.) |
-| `Choose a certificate to revoke. Your account has reached the maximum number of certificates` at archive | Every prior run minted a throwaway development certificate (see `APPLE_DEV_CERT_P12` above) and the account hit Apple's cap. Fix both halves: on [developer.apple.com → Certificates](https://developer.apple.com/account/resources/certificates/list), revoke the pile of *Apple Development: Created via API* certificates (safe — their private keys died with the runners); then add the `APPLE_DEV_CERT_P12` secret so runs stop minting new ones. |
+| `Choose a certificate to revoke. Your account has reached the maximum number of certificates` | Left over from the old automatic-signing archive, which minted an *Apple Development: Created via API* certificate per run. The current workflow never signs automatically, so this can only appear if the archive step was changed back. On [developer.apple.com → Certificates](https://developer.apple.com/account/resources/certificates/list), revoke the *Created via API* development certificates (safe — their private keys died with the runners). Keep the Apple Distribution certificate the secret holds. |
+| `No installed profile is named '…'` / `Profile '…' does not include the Apple Distribution certificate` | `APPLE_PROVISIONING_PROFILES` is stale or for the wrong certificate. Edit the profile on the portal, tick the current Apple Distribution certificate, re-download all profiles, rebuild the secret. |
+| `Expected exactly one 'Apple Distribution: …' identity` | `APPLE_DIST_CERT_P12` has no private key, holds a different certificate type, or the certificate was revoked/expired. Redo step 5. |
+| `… is an app/extension with no entry in PROVISIONING_PROFILES` | A new target (extension, watch app) joined the archive. Create its App Store profile and add a pair to `ci/release.config`. |
+| `profile resolved to '', expected '…'` | The per-bundle profile indirection didn't resolve, e.g. a target computes `PRODUCT_BUNDLE_IDENTIFIER` unusually. Set `CODE_SIGN_STYLE = Manual` and `PROVISIONING_PROFILE_SPECIFIER` for Release on that target in the project instead. |
 | `exportArchive: exportOptionsPlist error … method` | Xcode older than 15.3 doesn't know `app-store-connect`. Set `EXPORT_METHOD="app-store"` in `ci/release.config`, or pin a newer Xcode via `XCODE_VERSION`. |
 
 To see what actually got signed, download the run's artefact — it contains the
