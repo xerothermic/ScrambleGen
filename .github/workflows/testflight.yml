@@ -37,12 +37,14 @@ on:
     tags:
       - 'v*'
 
-# Two uploads racing each other would fight over the build number, and
-# App Store Connect rejects duplicates. Queue instead of cancelling: a
-# half-finished upload is worse than a slow one.
+# One group, so two uploads never race for the same build number. A newer
+# push cancels the older in-flight run instead of queueing behind it: only
+# the latest commit is worth a build, and cancelled runs just skip their
+# run-number-derived build number. Cancelling mid-upload leaves nothing
+# half-processed, since App Store Connect discards an incomplete upload.
 concurrency:
   group: testflight
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
