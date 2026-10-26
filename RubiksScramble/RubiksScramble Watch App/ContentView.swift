@@ -104,7 +104,7 @@ private struct ScrambleScreen: View {
                     Text(scrambleRows)
                         .font(.system(size: puzzle == .cube3x3 ? 19 : 16,
                                       weight: .semibold, design: .monospaced))
-                        .multilineTextAlignment(.center)
+                        .multilineTextAlignment(puzzle == .square1 ? .leading : .center)
                         .minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
