@@ -65,11 +65,22 @@ private struct ScrambleScreen: View {
     private var scrambleRows: String {
         let (width, perRow) = puzzle == .cube3x3 ? (2, 5) : (8, 2)
         let padded = (moves[puzzle] ?? []).map {
-            $0.padding(toLength: width, withPad: " ", startingAt: 0)
+            (puzzle == .square1 ? Self.aligned($0) : $0)
+                .padding(toLength: width, withPad: " ", startingAt: 0)
         }
         return stride(from: 0, to: padded.count, by: perRow)
             .map { padded[$0..<min($0 + perRow, padded.count)].joined(separator: " ") }
             .joined(separator: "\n")
+    }
+
+    /// Right-align each Square-1 number in a 2-char column, so `(1,0)/` reads
+    /// `( 1, 0)/` and `(-3,3)/` reads `(-3, 3)/`: the commas, parentheses and
+    /// slashes of every token line up in the monospaced rows. Bare `/` is left as is.
+    private static func aligned(_ token: String) -> String {
+        let parts = token.dropFirst().prefix { $0 != ")" }.split(separator: ",")
+        guard token.hasPrefix("("), parts.count == 2 else { return token }
+        let cols = parts.map { String(repeating: " ", count: max(0, 2 - $0.count)) + $0 }
+        return "(\(cols[0]),\(cols[1]))/"
     }
 
     var body: some View {
