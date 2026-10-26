@@ -40,10 +40,10 @@ enum Puzzle: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    var shortName: String {
+    var name: String {
         switch self {
         case .cube3x3: "3×3"
-        case .square1: "SQ-1"
+        case .square1: "Square-1"
         }
     }
 

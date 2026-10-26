@@ -28,7 +28,7 @@ enum CubeFace: Int, CaseIterable {
     }
 }
 
-private extension Color {
+extension Color {
     init(hex: UInt32) {
         self.init(
             .sRGB,

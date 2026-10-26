@@ -11,8 +11,7 @@ struct ContentView: View {
         // Swipe left/right between puzzles; each puzzle pages vertically.
         TabView(selection: $puzzle) {
             ForEach(Puzzle.allCases) { option in
-                PuzzlePage(puzzle: option, selection: $puzzle,
-                           lengths: $lengths, moves: $moves)
+                PuzzlePage(puzzle: option, lengths: $lengths, moves: $moves)
                     .tag(option)
             }
         }
@@ -28,29 +27,24 @@ struct ContentView: View {
 
 private struct PuzzlePage: View {
     let puzzle: Puzzle
-    @Binding var selection: Puzzle
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
 
     var body: some View {
-        let screen = ScrambleScreen(puzzle: puzzle, selection: $selection,
-                                    lengths: $lengths, moves: $moves)
-        // The net is a 3×3 cube state; Square-1 notation can't be applied to it.
-        if puzzle == .cube3x3 {
-            TabView {
-                screen
-                CubeMapView(moves: moves[puzzle] ?? [])
+        // Scramble on top; swipe down for the puzzle's state after it.
+        TabView {
+            ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
+            switch puzzle {
+            case .cube3x3: CubeMapView(moves: moves[puzzle] ?? [])
+            case .square1: Square1MapView(moves: moves[puzzle] ?? [])
             }
-            .tabViewStyle(.verticalPage)
-        } else {
-            screen
         }
+        .tabViewStyle(.verticalPage)
     }
 }
 
 private struct ScrambleScreen: View {
     let puzzle: Puzzle
-    @Binding var selection: Puzzle
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
@@ -82,29 +76,6 @@ private struct ScrambleScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    // Shows which puzzle this page is; tapping the other one
-                    // pages over, same as swiping.
-                    HStack(spacing: 6) {
-                        ForEach(Puzzle.allCases) { option in
-                            Button {
-                                focus = nil
-                                withAnimation { selection = option }
-                            } label: {
-                                Text(option.shortName)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(option == puzzle ? Color.black : Color.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        Capsule().fill(option == puzzle
-                                                       ? Color.accentColor
-                                                       : Color.gray.opacity(0.30))
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
                     // 3×3: the standard WCA scrambling orientation, with the
                     // green pill + white text echoing the two reference faces.
                     // Square-1: how to read the notation.
@@ -183,19 +154,17 @@ private struct ScrambleScreen: View {
                     }
                     .buttonStyle(.borderedProminent)
 
-                    if puzzle == .cube3x3 {
-                        VStack(spacing: 2) {
-                            Image(systemName: "chevron.compact.down")
-                            Text("Cube map")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
+                    VStack(spacing: 2) {
+                        Image(systemName: "chevron.compact.down")
+                        Text(puzzle == .cube3x3 ? "Cube map" : "Square-1 map")
+                            .font(.caption2)
                     }
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
                 }
                 .padding(.horizontal, 4)
             }
-            .navigationTitle("Scramble")
+            .navigationTitle(puzzle.name)
         }
         // Swiping to the other puzzle shouldn't leave the crown bound here.
         .onDisappear { focus = nil }
