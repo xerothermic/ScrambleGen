@@ -54,13 +54,14 @@ private struct ScrambleScreen: View {
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
-    // Enum-based focus so `focus = nil` *explicitly* means "no field
-    // focused" — a Bool `false` lets SwiftUI auto-restore focus to the
-    // only focusable on the page (the length pill), which is what caused
-    // tapping the notation to re-activate the pill.
+    // Single source of truth for "pill selected" is `isSelected`, toggled only
+    // by taps. Focus is just the mechanism that routes the crown to the pill:
+    // the pill is focusable only while selected, so otherwise the crown
+    // belongs to the ScrollView. Visuals follow `isSelected`, never focus.
     private enum FocusField: Hashable { case length }
     @FocusState private var focus: FocusField?
-    private var lengthFocused: Bool { focus == .length }
+    @State private var isSelected = false
+    private var lengthFocused: Bool { isSelected }
 
     private var length: Int { lengths[puzzle] ?? puzzle.defaultLength }
 
@@ -124,7 +125,7 @@ private struct ScrambleScreen: View {
                         // a reliable dismiss path if the pill's own toggle
                         // misbehaves.
                         .contentShape(Rectangle())
-                        .onTapGesture { focus = nil }
+                        .onTapGesture { isSelected = false }
 
                     // Crown-capture pill. Tap toggles focus (tap the scramble
                     // notation above also deactivates). No Button — on watchOS, Button taps move
@@ -158,12 +159,23 @@ private struct ScrambleScreen: View {
                                        : Color.gray.opacity(0.30))
                     )
                     .contentShape(Capsule())
-                    .focusable()
+                    .focusable(isSelected)
                     .focused($focus, equals: .length)
                     // Tap toggles: first tap selects (crown adjusts the
                     // count), second tap deselects (crown scrolls the page).
-                    .onTapGesture { focus = lengthFocused ? nil : .length }
-                    .sensoryFeedback(.selection, trigger: focus)
+                    .onTapGesture { isSelected.toggle() }
+                    .sensoryFeedback(.selection, trigger: isSelected)
+                    .onChange(of: isSelected) { _, selected in
+                        // Hand the crown to / take it from the pill. Deferred
+                        // a tick so focusable(true) has been applied first.
+                        Task { @MainActor in focus = selected ? .length : nil }
+                    }
+                    // Focus lost externally (user scrolled the page, swiped
+                    // away): deselect. Only reacts to losing an actual focus,
+                    // so the not-yet-focused moment after selecting is ignored.
+                    .onChange(of: focus) { old, new in
+                        if old == .length, new == nil, isSelected { isSelected = false }
+                    }
                     .digitalCrownRotation(
                         $crownLength,
                         from: Double(puzzle.lengthRange.lowerBound),
@@ -180,7 +192,7 @@ private struct ScrambleScreen: View {
 
                     Button {
                         moves[puzzle] = puzzle.generate(length: length)
-                        focus = nil
+                        isSelected = false
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
                             .font(.system(size: 17, weight: .semibold))
@@ -202,7 +214,7 @@ private struct ScrambleScreen: View {
             .navigationTitle(puzzle.name)
         }
         // Swiping to the other puzzle shouldn't leave the crown bound here.
-        .onDisappear { focus = nil }
+        .onDisappear { isSelected = false }
     }
 }
 
