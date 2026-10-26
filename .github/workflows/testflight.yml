@@ -397,7 +397,7 @@ jobs:
           plutil -replace signingCertificate -string "$SIGNING_CERTIFICATE" "$RUNNER_TEMP/ExportOptions.plist"
           plutil -replace provisioningProfiles -json '{}' "$RUNNER_TEMP/ExportOptions.plist"
 
-          # Archive-time overrides, one per line, read back with mapfile by
+          # Archive-time overrides, one per line, read back with a read loop (macOS bash 3.2 has no mapfile) by
           # the next two steps. A command-line build setting applies to
           # every target, but each bundle needs its own profile, so the
           # specifier indirects through a per-bundle setting:
@@ -440,7 +440,8 @@ jobs:
       - name: Verify archive signing settings
         run: |
           set -euo pipefail
-          mapfile -t OVERRIDES < "$RUNNER_TEMP/signing-overrides"
+          OVERRIDES=()
+          while IFS= read -r line; do OVERRIDES+=("$line"); done < "$RUNNER_TEMP/signing-overrides"
           xcodebuild -showBuildSettings -json \
             "$PROJECT_FLAG" "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -482,7 +483,8 @@ jobs:
       - name: Archive
         run: |
           set -euo pipefail
-          mapfile -t OVERRIDES < "$RUNNER_TEMP/signing-overrides"
+          OVERRIDES=()
+          while IFS= read -r line; do OVERRIDES+=("$line"); done < "$RUNNER_TEMP/signing-overrides"
           xcodebuild archive \
             "$PROJECT_FLAG" "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
