@@ -7,16 +7,30 @@
       buildImplicitDependencies = "YES">
       <BuildActionEntries>
          <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
+            buildForTesting = "NO"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
             buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
+            buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "BB0000000000000000000005"
                BuildableName = "CubeScramble.app"
                BlueprintName = "CubeScramble"
+               ReferencedContainer = "container:RubiksScramble.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "AA0000000000000000000005"
+               BuildableName = "RubiksScramble Watch App.app"
+               BlueprintName = "RubiksScramble Watch App"
                ReferencedContainer = "container:RubiksScramble.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -43,9 +57,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "BB0000000000000000000005"
-            BuildableName = "CubeScramble.app"
-            BlueprintName = "CubeScramble"
+            BlueprintIdentifier = "AA0000000000000000000005"
+            BuildableName = "RubiksScramble Watch App.app"
+            BlueprintName = "RubiksScramble Watch App"
             ReferencedContainer = "container:RubiksScramble.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -60,9 +74,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "BB0000000000000000000005"
-            BuildableName = "CubeScramble.app"
-            BlueprintName = "CubeScramble"
+            BlueprintIdentifier = "AA0000000000000000000005"
+            BuildableName = "RubiksScramble Watch App.app"
+            BlueprintName = "RubiksScramble Watch App"
             ReferencedContainer = "container:RubiksScramble.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
