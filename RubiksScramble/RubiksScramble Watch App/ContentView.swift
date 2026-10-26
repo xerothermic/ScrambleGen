@@ -64,6 +64,12 @@ private struct ScrambleScreen: View {
 
     private var length: Int { lengths[puzzle] ?? puzzle.defaultLength }
 
+    /// Where `length` sits within the puzzle's range, 0...1, for the meter.
+    private var lengthFraction: Double {
+        let r = puzzle.lengthRange
+        return Double(length - r.lowerBound) / Double(r.upperBound - r.lowerBound)
+    }
+
     /// Group moves into fixed-width rows so the wrap doesn't shift based on
     /// which moves happen to be short. Every token is padded to its puzzle's
     /// widest move — 2 chars for 3×3 (`R'`), 8 for Square-1 (`(-5,-5)/`) —
@@ -120,21 +126,31 @@ private struct ScrambleScreen: View {
                         .contentShape(Rectangle())
                         .onTapGesture { focus = nil }
 
-                    // Crown-capture pill. Each tap target is one-directional
-                    // so there's no toggle race: tap the pill to ACTIVATE
-                    // (sets focus true), tap the scramble notation above to
-                    // DEACTIVATE. No Button — on watchOS, Button taps move
+                    // Crown-capture pill. Tap toggles focus (tap the scramble
+                    // notation above also deactivates). No Button — on watchOS, Button taps move
                     // focus to themselves and would fight with our binding.
-                    HStack(spacing: 6) {
-                        Image(systemName: lengthFocused
-                              ? "dial.medium.fill"
-                              : "dial.medium")
-                        Text("\(puzzle.lengthLabel) \(length)")
+                    VStack(spacing: 5) {
+                        HStack(spacing: 6) {
+                            Image(systemName: lengthFocused
+                                  ? "dial.medium.fill"
+                                  : "dial.medium")
+                            Text("\(puzzle.lengthLabel) \(length)")
+                        }
+                        // Thermometer: count within the puzzle's range.
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill((lengthFocused ? Color.black : Color.white).opacity(0.25))
+                                Capsule()
+                                    .fill(lengthFocused ? Color.black : Color.accentColor)
+                                    .frame(width: max(4, geo.size.width * lengthFraction))
+                            }
+                        }
+                        .frame(height: 4)
                     }
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(lengthFocused ? Color.black : Color.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
+                    .padding(.vertical, 8)
                     .padding(.horizontal, 14)
                     .background(
                         Capsule().fill(lengthFocused
@@ -144,7 +160,9 @@ private struct ScrambleScreen: View {
                     .contentShape(Capsule())
                     .focusable()
                     .focused($focus, equals: .length)
-                    .onTapGesture { focus = .length }
+                    // Tap toggles: first tap selects (crown adjusts the
+                    // count), second tap deselects (crown scrolls the page).
+                    .onTapGesture { focus = lengthFocused ? nil : .length }
                     .sensoryFeedback(.selection, trigger: focus)
                     .digitalCrownRotation(
                         $crownLength,
