@@ -28,7 +28,7 @@ A standalone **watchOS 10+** app that generates **3x3 and Square-1** scrambles a
   - U white, D `#FFD500`, F `#30D158`, B `#0051BA`, L `#FF5800`, R `#CE2029` (fire-truck red).
 - `AccentColor` = cube green `#30D158`, so the New Scramble button matches the orientation pill.
 - Orientation pill text: **"White top · Green front"** (standard WCA scrambling orientation) for 3x3; for Square-1 it reads **"(top, bottom) · / = slice"** as a notation key.
-- Scramble formatting: every move padded to its puzzle's widest token, single-space joiner, explicit `\n` rows — 3x3: 2-char columns, 5 per row, 19pt; Square-1: 8-char columns (`(-5,-5)/`), 2 per row, 16pt. Keeps row width fixed across watch sizes.
+- Scramble formatting: every move padded to its puzzle's widest token, single-space joiner, explicit `\n` rows — 3x3: 2-char columns, 5 per row, 19pt; Square-1: each number right-aligned in a 2-char column (`( 1, 0)/`, display only — stored moves stay unpadded), 8-char tokens, 2 per row, 16pt, rows left-aligned. Keeps row width fixed across watch sizes.
 - Length per puzzle: 3x3 counts face turns (default 20, 1–50, label "Length"); Square-1 counts slices (default 15, 1–30, label "Slices").
 
 ## watchOS focus gotcha (already burned us once)
