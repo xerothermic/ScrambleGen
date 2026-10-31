@@ -34,8 +34,8 @@ on:
     branches:
       - main
       - claude/rubiks-scramble-watchos-Q6X15
-    tags:
-      - 'v*'
+    # v* tags belong to release.yml; firing both would upload the same
+    # commit twice under two different build numbers.
 
 # One group, so two uploads never race for the same build number. A newer
 # push cancels the older in-flight run instead of queueing behind it: only
@@ -509,6 +509,44 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$EXPORT_PATH"
           ls -la "$EXPORT_PATH"
+
+      # Print the bundle layout and the Info.plist keys App Store Connect
+      # keys off (ITSWatchOnlyContainer / WKWatchOnly / platform), so a
+      # packaging problem shows up here rather than in an email from Apple.
+      - name: Inspect exported bundle
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ipas=("$EXPORT_PATH"/*.ipa)
+          if [ ${#ipas[@]} -eq 0 ]; then echo "No .ipa exported."; exit 0; fi
+          INSPECT="$RUNNER_TEMP/inspect"
+          rm -rf "$INSPECT"; mkdir -p "$INSPECT"
+          unzip -q "${ipas[0]}" -d "$INSPECT"
+          find "$INSPECT/Payload" -maxdepth 4 \( -name '*.app' -o -name 'Info.plist' -o -name 'PrivacyInfo.xcprivacy' \) | sed "s|$INSPECT/||"
+          for plist in "$INSPECT"/Payload/*.app/Info.plist "$INSPECT"/Payload/*.app/Watch/*.app/Info.plist; do
+            echo "== ${plist#$INSPECT/}"
+            plutil -p "$plist" | grep -E 'CFBundleIdentifier|CFBundleSupportedPlatforms|CFBundleVersion|ITSWatchOnlyContainer|LSApplicationLaunchProhibited|UIDeviceFamily|WK[A-Za-z]+|"[0-9]+" => "' || true
+          done
+
+      # Dry runs stop short of uploading, so ask App Store Connect to
+      # validate the package against the app record instead. Nothing is
+      # uploaded; this only reports what the real upload would hit.
+      - name: Validate with App Store Connect (dry run)
+        if: ${{ inputs.dry_run }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ipas=("$EXPORT_PATH"/*.ipa)
+          [ ${#ipas[@]} -gt 0 ] || { echo "::error::No .ipa to validate."; exit 1; }
+          # altool only finds API keys in a few fixed directories.
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          cp "$ASC_KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          xcrun altool --validate-app -f "${ipas[0]}" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" --output-format normal
+          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
       # -allowProvisioningUpdates is kept here only so xcodebuild uses the
       # API key to talk to App Store Connect. With signingStyle manual it
