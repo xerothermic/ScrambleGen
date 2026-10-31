@@ -51,9 +51,11 @@ IDs, so this is required: the App Store profiles are created against them.
 ### 3. Create the App Store Connect app record
 
 App Store Connect → **Apps** → **+** → **New App**. The **Platform** must
-match `PLATFORM` in `ci/release.config` — a watchOS-only app needs a
-*watchOS* record, and an iOS record cannot accept a watchOS build or vice
-versa. The **Bundle ID** must match the target exactly.
+match `PLATFORM` in `ci/release.config`. There is no watchOS platform in
+that dialog: Apple's "Add watchOS app information" help page says to pick
+**iOS** for watch apps, including watch-only ones (they then need Apple
+Watch screenshots only). The **Bundle ID** must match the archived
+top-level target exactly (for a watch-only app, its container).
 
 The upload fails with "no suitable application record was found" until this
 exists.
