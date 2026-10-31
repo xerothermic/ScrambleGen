@@ -295,3 +295,19 @@ To see what actually got signed, download the run's artefact — it contains the
   prerequisite job if releases should be blocked on a red suite.
 - **App Store metadata** (screenshots, description, privacy answers) is only
   needed for App Store release, not TestFlight internal testing.
+
+## App Store release
+
+`.github/workflows/release.yml` builds an App Store candidate. It runs only
+from Actions -> App Store release -> Run workflow (inputs: `marketing_version`,
+`dry_run`, default true) or when a `v*` tag is pushed (tags upload for real).
+It uses the same secrets and signing as TestFlight. Once the build has
+processed, finish in App Store Connect by hand:
+
+1. Create or confirm the app record (name "Watch Scramble", bundle ID, SKU).
+2. Enter the privacy policy URL and answer the App Privacy questions.
+3. Upload screenshots for the required Apple Watch sizes.
+4. Complete the age rating questionnaire.
+5. Add review notes (no login needed; describe the 3x3 and Square-1 pages).
+6. On the version page, pick the processed build.
+7. Submit for review.
