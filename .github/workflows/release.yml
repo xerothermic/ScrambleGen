@@ -1,31 +1,43 @@
-name: App Store release
+name: App Store build
 
-# Builds and uploads an App Store candidate. Kept separate from testflight.yml
-# so routine TestFlight pushes never produce App Store builds. Triggered only
-# manually or by a v* tag. Signing, archive, export and upload steps are the
-# same as testflight.yml; the build still has to be picked and submitted for
-# review by hand in App Store Connect (docs/TESTFLIGHT.md, "App Store release").
+# App Store build: runs on every push to main, on v* tags, and manually.
+# Archives, signs and UPLOADS the build to App Store Connect, where it
+# appears under the app's builds. It NEVER submits for review: picking the
+# build and submitting it is always done by hand in App Store Connect.
+# TestFlight builds from other branches are manual, see testflight.yml.
+#
+# This file is repo-agnostic on purpose: everything project-specific lives in
+# ci/release.config, so the workflow can be copied between repos byte for
+# byte. Tools/install-testflight-pipeline.sh does the copying and writes the
+# config. Setup, secrets and troubleshooting: docs/TESTFLIGHT.md.
 
 on:
   workflow_dispatch:
     inputs:
       marketing_version:
-        description: 'Marketing version, e.g. 1.0.0. Blank reads it from the Xcode project.'
+        description: 'Marketing version, e.g. 0.1.0. Blank reads it from the Xcode project.'
+        required: false
+        type: string
+      build_number:
+        description: 'Build number. Blank uses minutes since the Unix epoch, shared with testflight.yml so numbers never collide.'
         required: false
         type: string
       dry_run:
         description: 'Archive and export, but do not upload to App Store Connect.'
         required: false
-        default: true
+        default: false
         type: boolean
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
-# Same group as testflight.yml so the two never race for a build number;
-# a release run is never cancelled by a later push.
+# Own group, distinct from testflight.yml's, so the two never cancel each
+# other's in-flight uploads. Store builds are never cancelled by a later
+# push: runs queue instead (GitHub keeps one pending run per group).
 concurrency:
-  group: testflight
+  group: app-store-build
   cancel-in-progress: false
 
 permissions:
@@ -33,7 +45,7 @@ permissions:
 
 jobs:
   release:
-    name: Archive & upload (App Store)
+    name: Archive & upload (App Store Connect)
     # macos-15 ships Xcode 16, whose watchOS SDK App Store Connect no
     # longer accepts. macos-26 carries Xcode 26; pin a specific one with
     # the XCODE_VERSION repository variable if the default drifts.
@@ -326,9 +338,7 @@ jobs:
       - name: Resolve version and build number
         env:
           INPUT_MARKETING_VERSION: ${{ inputs.marketing_version }}
-              # Keeps CI build numbers above the ones already used by hand.
-          # Raise this repository variable if a manual upload ever overtakes CI.
-          BUILD_NUMBER_OFFSET: ${{ vars.BUILD_NUMBER_OFFSET || '100' }}
+          INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
         run: |
           set -euo pipefail
 
@@ -353,7 +363,16 @@ jobs:
             exit 1
           fi
 
-          BUILD_NUMBER="$(( BUILD_NUMBER_OFFSET + GITHUB_RUN_NUMBER ))"
+          if [ -n "$INPUT_BUILD_NUMBER" ]; then
+            BUILD_NUMBER="$INPUT_BUILD_NUMBER"
+          else
+            # Minutes since the Unix epoch. GITHUB_RUN_NUMBER is per workflow, so
+            # testflight.yml and release.yml would both produce 101, 102, ...
+            # and collide in App Store Connect. Wall-clock minutes are shared
+            # by both, strictly increasing, 8 digits, and above any
+            # run-number-derived build already uploaded.
+            BUILD_NUMBER="$(( $(date -u +%s) / 60 ))"
+          fi
 
           echo "MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
@@ -487,6 +506,44 @@ jobs:
             -exportPath "$EXPORT_PATH"
           ls -la "$EXPORT_PATH"
 
+      # Print the bundle layout and the Info.plist keys App Store Connect
+      # keys off (ITSWatchOnlyContainer / WKWatchOnly / platform), so a
+      # packaging problem shows up here rather than in an email from Apple.
+      - name: Inspect exported bundle
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ipas=("$EXPORT_PATH"/*.ipa)
+          if [ ${#ipas[@]} -eq 0 ]; then echo "No .ipa exported."; exit 0; fi
+          INSPECT="$RUNNER_TEMP/inspect"
+          rm -rf "$INSPECT"; mkdir -p "$INSPECT"
+          unzip -q "${ipas[0]}" -d "$INSPECT"
+          find "$INSPECT/Payload" -maxdepth 4 \( -name '*.app' -o -name 'Info.plist' -o -name 'PrivacyInfo.xcprivacy' \) | sed "s|$INSPECT/||"
+          for plist in "$INSPECT"/Payload/*.app/Info.plist "$INSPECT"/Payload/*.app/Watch/*.app/Info.plist; do
+            echo "== ${plist#$INSPECT/}"
+            plutil -p "$plist" | grep -E 'CFBundleIdentifier|CFBundleSupportedPlatforms|CFBundleVersion|ITSWatchOnlyContainer|LSApplicationLaunchProhibited|UIDeviceFamily|WK[A-Za-z]+|"[0-9]+" => "' || true
+          done
+
+      # Dry runs stop short of uploading, so ask App Store Connect to
+      # validate the package against the app record instead. Nothing is
+      # uploaded; this only reports what the real upload would hit.
+      - name: Validate with App Store Connect (dry run)
+        if: ${{ inputs.dry_run }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ipas=("$EXPORT_PATH"/*.ipa)
+          [ ${#ipas[@]} -gt 0 ] || { echo "::error::No .ipa to validate."; exit 1; }
+          # altool only finds API keys in a few fixed directories.
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          cp "$ASC_KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          xcrun altool --validate-app -f "${ipas[0]}" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" --output-format normal
+          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
       # -allowProvisioningUpdates is kept here only so xcodebuild uses the
       # API key to talk to App Store Connect. With signingStyle manual it
       # can at most download a profile; it does not create certificates.
@@ -510,7 +567,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "### ${XCODE_SCHEME:-app} → App Store Connect (release candidate)"
+            echo "### ${XCODE_SCHEME:-app} → App Store Connect"
             echo
             echo "| | |"
             echo "|---|---|"
@@ -519,7 +576,7 @@ jobs:
             echo "| Commit | \`${GITHUB_SHA:0:8}\` |"
             echo "| Uploaded | ${{ inputs.dry_run && 'no (dry run)' || 'yes' }} |"
             echo
-            echo "Once processed, pick this build on the App Store version page and submit for review."
+            echo "Apple takes a few minutes to process the build. It is NOT submitted for review; do that by hand in App Store Connect."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload build artefacts
