@@ -34,8 +34,8 @@ on:
     branches:
       - main
       - claude/rubiks-scramble-watchos-Q6X15
-    tags:
-      - 'v*'
+    # v* tags belong to release.yml; firing both would upload the same
+    # commit twice under two different build numbers.
 
 # One group, so two uploads never race for the same build number. A newer
 # push cancels the older in-flight run instead of queueing behind it: only

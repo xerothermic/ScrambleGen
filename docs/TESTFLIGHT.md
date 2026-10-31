@@ -187,12 +187,9 @@ and fails in seconds with the same instruction if it's missing.
   skips the upload. Use this first: it proves the signing setup works without
   burning a build number in App Store Connect.
 
-**By tag** — pushing a `v*` tag runs the same thing and takes the marketing
-version from the tag:
-
-```sh
-git tag v0.2.0 && git push origin v0.2.0   # → uploads 0.2.0 (<offset + run>)
-```
+**By tag** — `v*` tags are handled by the App Store release workflow
+(`release.yml`, see "App Store release" below), not by this one, so a tag
+never uploads the same commit twice.
 
 ### Version and build numbers
 
