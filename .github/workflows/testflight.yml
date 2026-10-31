@@ -1,8 +1,17 @@
 name: TestFlight
 
-# Archives an Apple app with distribution signing and hands the build to App
-# Store Connect, which makes it available in TestFlight once Apple's
-# processing finishes (usually 5-15 minutes after upload).
+# AUTOMATIC TestFlight build: runs on every push to any branch except main,
+# and can still be started by hand via workflow_dispatch (Actions tab, or
+# `gh workflow run testflight.yml --ref <branch>`). Pushes to main and v* tags
+# are handled by release.yml (the App Store build) instead; tags never
+# trigger this workflow. Archives an Apple app with distribution signing
+# and hands the build to App Store Connect, which makes it available in
+# TestFlight once Apple's processing finishes (usually 5-15 minutes after
+# upload).
+#
+# COST: every push spends macOS runner minutes (10x multiplier on private
+# repos such as GoWatch). If minutes run low, delete the `push:` trigger below
+# so the workflow is workflow_dispatch only.
 #
 # This file is repo-agnostic on purpose: everything project-specific lives in
 # ci/release.config, so the workflow can be copied between repos byte for
@@ -10,6 +19,8 @@ name: TestFlight
 # config. Setup, secrets and troubleshooting: docs/TESTFLIGHT.md.
 
 on:
+  push:
+    branches: ['**', '!main']
   workflow_dispatch:
     inputs:
       marketing_version:
@@ -17,7 +28,7 @@ on:
         required: false
         type: string
       build_number:
-        description: 'Build number. Blank derives one from the run number (see BUILD_NUMBER_OFFSET).'
+        description: 'Build number. Blank uses minutes since the Unix epoch, shared with release.yml so numbers never collide.'
         required: false
         type: string
       dry_run:
@@ -25,25 +36,15 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    # Every push to a working branch ships a build, so a change can be on
-    # the wrist a few minutes later. This repo is public, so macOS runner
-    # minutes are free; a private one bills them at 10x and would want a
-    # narrower trigger. `on:` cannot read ci/release.config, so this
-    # branch list is edited by hand per repo.
-    branches:
-      - main
-      - claude/rubiks-scramble-watchos-Q6X15
-    # v* tags belong to release.yml; firing both would upload the same
-    # commit twice under two different build numbers.
 
-# One group, so two uploads never race for the same build number. A newer
-# push cancels the older in-flight run instead of queueing behind it: only
-# the latest commit is worth a build, and cancelled runs just skip their
-# run-number-derived build number. Cancelling mid-upload leaves nothing
-# half-processed, since App Store Connect discards an incomplete upload.
+# Own group per ref, distinct from release.yml's, so a TestFlight run and a
+# store build never cancel each other, and different branches build in
+# parallel. Within one ref a newer run cancels the older in-flight one: only
+# the latest push is worth shipping, so rapid pushes don't pile up.
+# Cancelling mid-upload leaves nothing half-processed, since App Store
+# Connect discards an incomplete upload.
 concurrency:
-  group: testflight
+  group: testflight-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -345,9 +346,6 @@ jobs:
         env:
           INPUT_MARKETING_VERSION: ${{ inputs.marketing_version }}
           INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
-          # Keeps CI build numbers above the ones already used by hand.
-          # Raise this repository variable if a manual upload ever overtakes CI.
-          BUILD_NUMBER_OFFSET: ${{ vars.BUILD_NUMBER_OFFSET || '100' }}
         run: |
           set -euo pipefail
 
@@ -375,7 +373,12 @@ jobs:
           if [ -n "$INPUT_BUILD_NUMBER" ]; then
             BUILD_NUMBER="$INPUT_BUILD_NUMBER"
           else
-            BUILD_NUMBER="$(( BUILD_NUMBER_OFFSET + GITHUB_RUN_NUMBER ))"
+            # Minutes since the Unix epoch. GITHUB_RUN_NUMBER is per workflow, so
+            # testflight.yml and release.yml would both produce 101, 102, ...
+            # and collide in App Store Connect. Wall-clock minutes are shared
+            # by both, strictly increasing, 8 digits, and above any
+            # run-number-derived build already uploaded.
+            BUILD_NUMBER="$(( $(date -u +%s) / 60 ))"
           fi
 
           echo "MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
