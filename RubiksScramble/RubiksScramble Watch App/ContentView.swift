@@ -9,22 +9,150 @@ struct ContentView: View {
     // Which vertical page (0 = scramble, 1 = map) each puzzle is showing.
     @State private var pages: [Puzzle: Int] = [:]
 
+    // nil = the Wallet-style card stack; otherwise the open puzzle.
+    @State private var openPuzzle: Puzzle?
+
     var body: some View {
-        // Swipe left/right between puzzles; each puzzle pages vertically.
-        TabView(selection: $puzzle) {
-            ForEach(Puzzle.allCases) { option in
-                PuzzlePage(puzzle: option, lengths: $lengths, moves: $moves,
-                           page: Binding(get: { pages[option] ?? 0 },
-                                         set: { pages[option] = $0 }))
-                    .tag(option)
+        Group {
+            if let open = openPuzzle {
+                PuzzlePage(puzzle: open, lengths: $lengths, moves: $moves,
+                           page: Binding(get: { pages[open] ?? 0 },
+                                         set: { pages[open] = $0 }))
+                    // Invisible close button, upper left (like dismissing a
+                    // Wallet pass): no chrome, but tappable and labelled.
+                    .overlay(alignment: .topLeading) {
+                        Button {
+                            withAnimation { openPuzzle = nil }
+                        } label: {
+                            Color.clear
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Close")
+                    }
+                    .transition(.opacity)
+            } else {
+                CardStack(lastUsed: puzzle) { option in
+                    puzzle = option
+                    withAnimation { openPuzzle = option }
+                }
+                .transition(.opacity)
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: pages[puzzle] == 1 ? .never : .automatic))
         .onAppear {
             for option in Puzzle.allCases where moves[option] == nil {
                 moves[option] = option.generate(
                     length: lengths[option] ?? option.defaultLength)
             }
+        }
+    }
+}
+
+/// Wallet-style stack of overlapping cards, one per puzzle. Tap a card to open it.
+private struct CardStack: View {
+    let lastUsed: Puzzle
+    let onPick: (Puzzle) -> Void
+
+    private let cardHeight: CGFloat = 120
+    private let peek: CGFloat = 64
+
+    private func color(_ option: Puzzle) -> Color {
+        switch option {
+        case .cube3x3: Color(red: 0.19, green: 0.82, blue: 0.35)  // cube green
+        case .square1: Color(red: 0.81, green: 0.13, blue: 0.16)  // WCA front red
+        }
+    }
+
+    /// Tiny solved-state map of the puzzle, reusing the real map drawing code.
+    @ViewBuilder
+    private func preview(_ option: Puzzle) -> some View {
+        switch option {
+        case .cube3x3:
+            let cube = CubeState()
+            let cell: CGFloat = 3.5
+            let face: CGFloat = cell * 3 + 1
+            VStack(spacing: 1) {
+                ForEach(0..<3, id: \.self) { row in
+                    HStack(spacing: 1) {
+                        ForEach(0..<4, id: \.self) { col in
+                            if let f = Self.net[row][col] {
+                                miniFace(cube, f, cell: cell)
+                            } else {
+                                Color.clear.frame(width: face, height: face)
+                            }
+                        }
+                    }
+                }
+            }
+        case .square1:
+            let state = Square1State()
+            Canvas { context, size in
+                Square1Drawing.draw(state, in: &context, size: size)
+            }
+            .frame(width: 26, height: 50)
+        }
+    }
+
+    private static let net: [[CubeFace?]] = [
+        [nil, .up, nil, nil],
+        [.left, .front, .right, .back],
+        [nil, .down, nil, nil],
+    ]
+
+    private func miniFace(_ cube: CubeState, _ face: CubeFace, cell: CGFloat) -> some View {
+        VStack(spacing: 0.5) {
+            ForEach(0..<3, id: \.self) { r in
+                HStack(spacing: 0.5) {
+                    ForEach(0..<3, id: \.self) { c in
+                        Rectangle()
+                            .fill(cube.color(face: face, row: r, col: c))
+                            .frame(width: cell, height: cell)
+                    }
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            // Each card sits on top of the previous one, leaving a strip showing.
+            ZStack(alignment: .top) {
+                ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
+                    Button {
+                        onPick(option)
+                    } label: {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(option.name)
+                                    .font(.system(size: 20, weight: .bold))
+                                Text(option == lastUsed ? "Last used" : "Scramble")
+                                    .font(.caption2)
+                                    .opacity(0.8)
+                                Spacer()
+                            }
+                            Spacer(minLength: 4)
+                            preview(option)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: cardHeight)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(color(option)))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .strokeBorder(Color.black.opacity(0.35), lineWidth: 1)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 18))
+                    }
+                    .buttonStyle(.plain)
+                    .offset(y: CGFloat(index) * peek)
+                    .accessibilityLabel("\(option.name) scramble")
+                }
+            }
+            .frame(height: cardHeight + CGFloat(Puzzle.allCases.count - 1) * peek,
+                   alignment: .top)
+            .padding(.horizontal, 4)
         }
     }
 }

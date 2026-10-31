@@ -62,7 +62,7 @@ struct Square1MapView: View {
     }
 }
 
-private enum Square1Drawing {
+enum Square1Drawing {
     static let multiplier: CGFloat = 1.4
     static let radiusMultiplier: CGFloat = sqrt(2) * cos(15 * .pi / 180)
 
