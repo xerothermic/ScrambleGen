@@ -198,9 +198,10 @@ never uploads the same commit twice.
 
 App Store Connect rejects a build whose `(version, build)` pair it has already
 seen, so the build number must strictly increase within a marketing version.
-The default `BUILD_NUMBER_OFFSET + GITHUB_RUN_NUMBER` guarantees that as long
-as nobody uploads by hand from a Mac. If someone does and overtakes CI, raise
-`BUILD_NUMBER_OFFSET` past the manual number.
+The default is a sequential counter in `ci/build-number`: both workflows run
+`ci/reserve-build-number.sh`, which adds 1, commits it back with `[skip ci]`
+and uses it. Reset the file to `0` when the marketing version changes. Pass
+`build_number` to override (e.g. a hotfix for an older version).
 
 `manageAppVersionAndBuildNumber` is `false` in `ci/ExportOptions.plist`
 precisely so Xcode doesn't quietly substitute its own numbering.

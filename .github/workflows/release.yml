@@ -19,7 +19,7 @@ on:
         required: false
         type: string
       build_number:
-        description: 'Build number. Blank uses minutes since the Unix epoch, shared with testflight.yml so numbers never collide.'
+        description: 'Build number. Blank takes the next number from ci/build-number (shared by both workflows) and commits the bump.'
         required: false
         type: string
       dry_run:
@@ -33,15 +33,16 @@ on:
     tags:
       - 'v*'
 
-# Own group, distinct from testflight.yml's, so the two never cancel each
-# other's in-flight uploads. Store builds are never cancelled by a later
-# push: runs queue instead (GitHub keeps one pending run per group).
+# ONE group shared with testflight.yml: every build reads, bumps and pushes
+# ci/build-number, so builds run one at a time and never race for a number.
+# Store builds are never cancelled by a later push: runs queue instead
+# (GitHub keeps one pending run per group).
 concurrency:
-  group: app-store-build
+  group: build-number
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write   # pushes the ci/build-number bump
 
 jobs:
   release:
@@ -339,6 +340,7 @@ jobs:
         env:
           INPUT_MARKETING_VERSION: ${{ inputs.marketing_version }}
           INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
 
@@ -366,12 +368,9 @@ jobs:
           if [ -n "$INPUT_BUILD_NUMBER" ]; then
             BUILD_NUMBER="$INPUT_BUILD_NUMBER"
           else
-            # Minutes since the Unix epoch. GITHUB_RUN_NUMBER is per workflow, so
-            # testflight.yml and release.yml would both produce 101, 102, ...
-            # and collide in App Store Connect. Wall-clock minutes are shared
-            # by both, strictly increasing, 8 digits, and above any
-            # run-number-derived build already uploaded.
-            BUILD_NUMBER="$(( $(date -u +%s) / 60 ))"
+            # Sequential counter in ci/build-number, shared by testflight.yml
+            # and release.yml and committed back by CI. See the script.
+            BUILD_NUMBER="$(DRY_RUN="$INPUT_DRY_RUN" ci/reserve-build-number.sh)"
           fi
 
           echo "MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
