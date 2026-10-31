@@ -11,6 +11,42 @@ struct ContentView: View {
 
     // nil = the Wallet-style card stack; otherwise the open puzzle.
     @State private var openPuzzle: Puzzle?
+    @Namespace private var cardSpace
+
+    // Close affordance: invisible until the screen is touched, then a small
+    // xmark that fades out again ~3 s after the last touch.
+    @State private var showClose = false
+    @State private var touching = false
+    @State private var hideTask: Task<Void, Never>?
+
+    private static let spring = Animation.spring(response: 0.45, dampingFraction: 0.82)
+
+    private func close() {
+        hideTask?.cancel()
+        showClose = false
+        withAnimation(Self.spring) { openPuzzle = nil }
+    }
+
+    private func scheduleHide() {
+        hideTask?.cancel()
+        hideTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.5)) { showClose = false }
+        }
+    }
+
+    private func touchBegan() {
+        guard !touching else { return }
+        touching = true
+        hideTask?.cancel()
+        withAnimation(.easeIn(duration: 0.15)) { showClose = true }
+    }
+
+    private func touchEnded() {
+        touching = false
+        scheduleHide()
+    }
 
     var body: some View {
         Group {
@@ -18,24 +54,50 @@ struct ContentView: View {
                 PuzzlePage(puzzle: open, lengths: $lengths, moves: $moves,
                            page: Binding(get: { pages[open] ?? 0 },
                                          set: { pages[open] = $0 }))
-                    // Invisible close button, upper left (like dismissing a
-                    // Wallet pass): no chrome, but tappable and labelled.
+                    .background(
+                        // The tapped card grows into this tinted full-screen panel.
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(open.cardColor.opacity(0.35))
+                            .matchedGeometryEffect(id: open, in: cardSpace)
+                            .ignoresSafeArea()
+                    )
+                    // Any touch reveals the close button. simultaneousGesture
+                    // keeps the puzzle's own taps and paging working.
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in touchBegan() }
+                            .onEnded { _ in touchEnded() }
+                    )
+                    // Rightward swipe that starts at the left edge also closes.
+                    // Vertical paging and taps are unaffected.
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 20)
+                            .onEnded { g in
+                                if g.startLocation.x < 28,
+                                   g.translation.width > 50,
+                                   abs(g.translation.height) < 40 { close() }
+                            }
+                    )
                     .overlay(alignment: .topLeading) {
-                        Button {
-                            withAnimation { openPuzzle = nil }
-                        } label: {
-                            Color.clear
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
+                        Button { close() } label: {
+                            ZStack {
+                                Circle().fill(.ultraThinMaterial)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                            .frame(width: 26, height: 26)
+                            .opacity(showClose ? 1 : 0)
+                            .frame(width: 60, height: 60, alignment: .topLeading)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Close")
                     }
                     .transition(.opacity)
             } else {
-                CardStack(lastUsed: puzzle) { option in
+                CardStack(lastUsed: puzzle, space: cardSpace) { option in
                     puzzle = option
-                    withAnimation { openPuzzle = option }
+                    withAnimation(Self.spring) { openPuzzle = option }
                 }
                 .transition(.opacity)
             }
@@ -52,17 +114,13 @@ struct ContentView: View {
 /// Wallet-style stack of overlapping cards, one per puzzle. Tap a card to open it.
 private struct CardStack: View {
     let lastUsed: Puzzle
+    let space: Namespace.ID
     let onPick: (Puzzle) -> Void
 
     private let cardHeight: CGFloat = 120
     private let peek: CGFloat = 64
 
-    private func color(_ option: Puzzle) -> Color {
-        switch option {
-        case .cube3x3: Color(red: 0.19, green: 0.82, blue: 0.35)  // cube green
-        case .square1: Color(red: 0.81, green: 0.13, blue: 0.16)  // WCA front red
-        }
-    }
+    private func color(_ option: Puzzle) -> Color { option.cardColor }
 
     /// Tiny solved-state map of the puzzle, reusing the real map drawing code.
     @ViewBuilder
@@ -115,10 +173,12 @@ private struct CardStack: View {
     }
 
     var body: some View {
+        // Crown / touch scrolls the stack. Cards overlap via negative spacing,
+        // later cards on top; scrollTransition tilts each card in perspective
+        // (like Wallet) as it nears the top or bottom edge.
         ScrollView {
-            // Each card sits on top of the previous one, leaving a strip showing.
-            ZStack(alignment: .top) {
-                ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
+            VStack(spacing: peek - cardHeight) {
+                ForEach(Puzzle.allCases, id: \.self) { option in
                     Button {
                         onPick(option)
                     } label: {
@@ -138,21 +198,47 @@ private struct CardStack: View {
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(height: cardHeight)
-                        .background(RoundedRectangle(cornerRadius: 18).fill(color(option)))
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(LinearGradient(
+                                    colors: [color(option), color(option).opacity(0.75)],
+                                    startPoint: .top, endPoint: .bottom))
+                                .matchedGeometryEffect(id: option, in: space)
+                        )
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
-                                .strokeBorder(Color.black.opacity(0.35), lineWidth: 1)
+                                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 18))
+                        // Two layers: tight contact shadow + soft ambient one,
+                        // which also separates overlapping cards.
+                        .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+                        .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
                     }
                     .buttonStyle(.plain)
-                    .offset(y: CGFloat(index) * peek)
+                    .scrollTransition(axis: .vertical) { content, phase in
+                        content
+                            .rotation3DEffect(.degrees(phase.value * -22),
+                                              axis: (x: 1, y: 0, z: 0),
+                                              anchor: .center, perspective: 0.6)
+                            .scaleEffect(1 - abs(phase.value) * 0.06)
+                            .opacity(1 - abs(phase.value) * 0.25)
+                    }
                     .accessibilityLabel("\(option.name) scramble")
                 }
             }
-            .frame(height: cardHeight + CGFloat(Puzzle.allCases.count - 1) * peek,
-                   alignment: .top)
             .padding(.horizontal, 4)
+            .padding(.vertical, 6)
+        }
+    }
+}
+
+extension Puzzle {
+    /// Card / panel colour for this puzzle.
+    var cardColor: Color {
+        switch self {
+        case .cube3x3: Color(red: 0.19, green: 0.82, blue: 0.35)  // cube green
+        case .square1: Color(red: 0.81, green: 0.13, blue: 0.16)  // WCA front red
         }
     }
 }
