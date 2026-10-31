@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>RubiksScramble app icon (1024×1024)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #000; }
+  /* Watch icons get a circular mask; the design's meaningful content sits
+     inside an inner disc, with the corners safe to crop. */
+  .icon {
+    width: 1024px;
+    height: 1024px;
+    background: radial-gradient(ellipse at 50% 28%, #1f1f23 0%, #050507 80%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .face {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 22px;
+    width: 640px;
+    height: 640px;
+    transform: perspective(900px) rotateX(8deg) rotateY(-8deg);
+    filter: drop-shadow(0 36px 80px rgba(0,0,0,0.75));
+  }
+  .sticker {
+    border-radius: 36px;
+    box-shadow:
+      inset 0 0 0 5px rgba(0,0,0,0.20),
+      inset 0 -10px 0 rgba(0,0,0,0.18);
+  }
+</style>
+</head>
+<body>
+<div class="icon" id="icon">
+  <div class="face">
+    <div class="sticker" style="background:#FFD500"></div>
+    <div class="sticker" style="background:#FFFFFF"></div>
+    <div class="sticker" style="background:#30D158"></div>
+    <div class="sticker" style="background:#0051BA"></div>
+    <div class="sticker" style="background:#FFD500"></div>
+    <div class="sticker" style="background:#FFFFFF"></div>
+    <div class="sticker" style="background:#FF5800"></div>
+    <div class="sticker" style="background:#30D158"></div>
+    <div class="sticker" style="background:#CE2029"></div>
+  </div>
+</div>
+</body>
+</html>

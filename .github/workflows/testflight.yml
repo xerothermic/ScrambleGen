@@ -1,0 +1,569 @@
+name: TestFlight
+
+# Archives an Apple app with distribution signing and hands the build to App
+# Store Connect, which makes it available in TestFlight once Apple's
+# processing finishes (usually 5-15 minutes after upload).
+#
+# This file is repo-agnostic on purpose: everything project-specific lives in
+# ci/release.config, so the workflow can be copied between repos byte for
+# byte. Tools/install-testflight-pipeline.sh does the copying and writes the
+# config. Setup, secrets and troubleshooting: docs/TESTFLIGHT.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      marketing_version:
+        description: 'Marketing version, e.g. 0.1.0. Blank reads it from the Xcode project.'
+        required: false
+        type: string
+      build_number:
+        description: 'Build number. Blank derives one from the run number (see BUILD_NUMBER_OFFSET).'
+        required: false
+        type: string
+      dry_run:
+        description: 'Archive and export, but do not upload to App Store Connect.'
+        required: false
+        default: false
+        type: boolean
+  push:
+    # Every push to a working branch ships a build, so a change can be on
+    # the wrist a few minutes later. This repo is public, so macOS runner
+    # minutes are free; a private one bills them at 10x and would want a
+    # narrower trigger. `on:` cannot read ci/release.config, so this
+    # branch list is edited by hand per repo.
+    branches:
+      - main
+      - claude/rubiks-scramble-watchos-Q6X15
+    tags:
+      - 'v*'
+
+# One group, so two uploads never race for the same build number. A newer
+# push cancels the older in-flight run instead of queueing behind it: only
+# the latest commit is worth a build, and cancelled runs just skip their
+# run-number-derived build number. Cancelling mid-upload leaves nothing
+# half-processed, since App Store Connect discards an incomplete upload.
+concurrency:
+  group: testflight
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: Archive & upload
+    # macos-15 ships Xcode 16, whose watchOS SDK App Store Connect no
+    # longer accepts. macos-26 carries Xcode 26; pin a specific one with
+    # the XCODE_VERSION repository variable if the default drifts.
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    env:
+      ARCHIVE_PATH: ${{ github.workspace }}/build/App.xcarchive
+      EXPORT_PATH: ${{ github.workspace }}/build/export
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail before spending 20 minutes on an archive that can't be signed.
+      - name: Check required secrets
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_DIST_CERT_P12: ${{ secrets.APPLE_DIST_CERT_P12 }}
+          APPLE_DIST_CERT_PASSWORD: ${{ secrets.APPLE_DIST_CERT_PASSWORD }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          APPLE_PROVISIONING_PROFILES: ${{ secrets.APPLE_PROVISIONING_PROFILES }}
+        run: |
+          set -euo pipefail
+          missing=()
+          # Signing is fully manual (Apple Distribution cert + App Store
+          # profiles), so all seven are required. Nothing is ever created
+          # on the developer portal by CI, so a missing one is fatal here
+          # rather than papered over by Xcode minting a certificate.
+          for name in APPLE_TEAM_ID APPLE_DIST_CERT_P12 APPLE_DIST_CERT_PASSWORD \
+                      ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY \
+                      APPLE_PROVISIONING_PROFILES; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}. See docs/TESTFLIGHT.md."
+            exit 1
+          fi
+          echo "All required secrets are present."
+
+      - name: Load release config
+        run: |
+          set -euo pipefail
+          if [ ! -f ci/release.config ]; then
+            echo "::error::ci/release.config not found. Run Tools/install-testflight-pipeline.sh to create it."
+            exit 1
+          fi
+          # shellcheck disable=SC1091
+          . ci/release.config
+
+          for key in XCODE_PROJECT XCODE_SCHEME PLATFORM SIGNING_CERTIFICATE PROVISIONING_PROFILES; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::ci/release.config is missing $key. Signing is manual: SIGNING_CERTIFICATE=\"Apple Distribution\" and one <bundle-id>=<App Store profile name> pair per bundle in PROVISIONING_PROFILES. See docs/TESTFLIGHT.md."
+              exit 1
+            fi
+          done
+
+          if [ ! -e "$XCODE_PROJECT" ]; then
+            echo "::error::XCODE_PROJECT '$XCODE_PROJECT' does not exist in the repo."
+            exit 1
+          fi
+
+          case "$XCODE_PROJECT" in
+            *.xcworkspace) PROJECT_FLAG="-workspace" ;;
+            *.xcodeproj)   PROJECT_FLAG="-project" ;;
+            *) echo "::error::XCODE_PROJECT must end in .xcodeproj or .xcworkspace."; exit 1 ;;
+          esac
+
+          # xcodebuild can only see schemes marked Shared and committed to git;
+          # the ones Xcode autocreates live in xcuserdata and never reach CI.
+          if [ "$PROJECT_FLAG" = "-project" ] &&
+             ! compgen -G "$XCODE_PROJECT/xcshareddata/xcschemes/*.xcscheme" > /dev/null; then
+            echo "::error::$XCODE_PROJECT has no shared schemes. In Xcode: Product → Scheme → Manage Schemes → tick 'Shared', then commit $XCODE_PROJECT/xcshareddata/."
+            exit 1
+          fi
+
+          # An empty AppIcon set passes the build and then fails validation at
+          # upload time, ~20 minutes later. Say so now.
+          while IFS= read -r iconset; do
+            if ! compgen -G "$iconset/*.png" > /dev/null; then
+              echo "::warning::$iconset contains no image — App Store Connect rejects builds without an app icon."
+            fi
+          done < <(find . -type d -name 'AppIcon.appiconset' -not -path './.git/*')
+
+          {
+            echo "XCODE_PROJECT=$XCODE_PROJECT"
+            echo "XCODE_SCHEME=$XCODE_SCHEME"
+            echo "PLATFORM=$PLATFORM"
+            echo "PROJECT_FLAG=$PROJECT_FLAG"
+            echo "TEAM_XCCONFIG=${TEAM_XCCONFIG:-}"
+            echo "EXPORT_METHOD=${EXPORT_METHOD:-app-store-connect}"
+            echo "SIGNING_CERTIFICATE=$SIGNING_CERTIFICATE"
+            echo "PROVISIONING_PROFILES=$PROVISIONING_PROFILES"
+          } >> "$GITHUB_ENV"
+
+          echo "Releasing scheme '$XCODE_SCHEME' from $XCODE_PROJECT for $PLATFORM."
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          # Pin by setting the XCODE_VERSION repository variable (e.g. "26.0")
+          # when the runner's default drifts away from what the project needs.
+          if [ -n "${{ vars.XCODE_VERSION }}" ]; then
+            sudo xcode-select -s "/Applications/Xcode_${{ vars.XCODE_VERSION }}.app/Contents/Developer"
+          fi
+          xcode-select -p
+          xcodebuild -version
+
+      # Some projects reference a gitignored xcconfig holding each developer's
+      # DEVELOPMENT_TEAM. Xcode refuses to open the project when the file is
+      # missing, so CI writes its own. Skipped when TEAM_XCCONFIG is empty.
+      - name: Write team xcconfig
+        if: ${{ env.TEAM_XCCONFIG != '' }}
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: echo "DEVELOPMENT_TEAM = $APPLE_TEAM_ID" > "$TEAM_XCCONFIG"
+
+      # Signing is manual end to end: the Apple Distribution identity from
+      # APPLE_DIST_CERT_P12 plus the App Store profiles from
+      # APPLE_PROVISIONING_PROFILES. No development certificate is needed,
+      # and nothing in this workflow may create one: automatic signing with
+      # -allowProvisioningUpdates used to mint an "Apple Development: Created
+      # via API" certificate per run (its private key dies with the runner)
+      # until the account hit Apple's certificate cap.
+      - name: Import signing certificate
+        env:
+          APPLE_DIST_CERT_P12: ${{ secrets.APPLE_DIST_CERT_P12 }}
+          APPLE_DIST_CERT_PASSWORD: ${{ secrets.APPLE_DIST_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          CERT="$RUNNER_TEMP/dist.p12"
+
+          echo "$APPLE_DIST_CERT_P12" | base64 --decode > "$CERT"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Auto-lock after 6h so a hung job can't leave it open indefinitely.
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          if ! security import "$CERT" -k "$KEYCHAIN" -P "$APPLE_DIST_CERT_PASSWORD" \
+                 -T /usr/bin/codesign -T /usr/bin/security -f pkcs12; then
+            rm -f "$CERT"
+            echo "::error::Could not import APPLE_DIST_CERT_P12. Usually a wrong APPLE_DIST_CERT_PASSWORD, or the secret is not base64 of a .p12. See docs/TESTFLIGHT.md."
+            exit 1
+          fi
+          rm -f "$CERT"
+          # Without this, codesign prompts for keychain access and hangs.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          # Prepend to the search list, keeping the runner's existing keychains.
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | tr -d '"')
+
+          echo "SIGNING_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+          # The identity the profiles must embed. Its SHA-1 is the public
+          # certificate fingerprint, not secret material.
+          matches="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+                     | grep -F "\"$SIGNING_CERTIFICATE:" || true)"
+          count="$(printf '%s' "$matches" | grep -c . || true)"
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Expected exactly one '$SIGNING_CERTIFICATE: …' identity (certificate + private key) in APPLE_DIST_CERT_P12, found $count. Export the Apple Distribution row with its private key from Keychain Access → My Certificates. See docs/TESTFLIGHT.md."
+            exit 1
+          fi
+          echo "DIST_CERT_SHA1=$(printf '%s' "$matches" | awk '{print $2}')" >> "$GITHUB_ENV"
+
+      # Xcode resolves PROVISIONING_PROFILE_SPECIFIER against the profiles
+      # in this directory; nothing is downloaded from Apple.
+      - name: Install provisioning profiles
+        env:
+          APPLE_PROVISIONING_PROFILES: ${{ secrets.APPLE_PROVISIONING_PROFILES }}
+        run: |
+          set -euo pipefail
+          DEST="$HOME/Library/MobileDevice/Provisioning Profiles"
+          WORK="$RUNNER_TEMP/profiles"
+          DECODED="$RUNNER_TEMP/profiles-decoded"
+          mkdir -p "$DEST" "$WORK" "$DECODED"
+          if ! echo "$APPLE_PROVISIONING_PROFILES" | base64 --decode > "$RUNNER_TEMP/profiles.tar.gz" ||
+             ! tar xzf "$RUNNER_TEMP/profiles.tar.gz" -C "$WORK"; then
+            echo "::error::APPLE_PROVISIONING_PROFILES is not base64 of a .tar.gz. Build it with: tar czf profiles.tar.gz *.mobileprovision && base64 -i profiles.tar.gz | pbcopy"
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/profiles.tar.gz"
+
+          found=0
+          while IFS= read -r -d '' pp; do
+            security cms -D -i "$pp" > "$DECODED/current.plist"
+            # Xcode looks these up by UUID, not by the file name it was given.
+            uuid=$(plutil -extract UUID raw -o - "$DECODED/current.plist")
+            mv "$DECODED/current.plist" "$DECODED/$uuid.plist"
+            cp "$pp" "$DEST/$uuid.mobileprovision"
+            found=$((found + 1))
+          done < <(find "$WORK" -name '*.mobileprovision' -print0)
+          rm -rf "$WORK"
+          if [ "$found" -eq 0 ]; then
+            echo "::error::APPLE_PROVISIONING_PROFILES contains no .mobileprovision files."
+            exit 1
+          fi
+          echo "PROFILES_DECODED=$DECODED" >> "$GITHUB_ENV"
+
+      # Names only: what codesign can use, and which profile goes with which
+      # bundle. Then check every named profile is an App Store profile for
+      # the right bundle and team, unexpired, and embeds the imported
+      # certificate — the usual reasons a manual archive fails 10 minutes in.
+      - name: Show and verify signing setup
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          echo "Signing identities in the CI keychain:"
+          security find-identity -v -p codesigning "$SIGNING_KEYCHAIN" \
+            | sed -n 's/^ *[0-9]*) [0-9A-F]* \(".*"\).*/  \1/p'
+          echo
+          python3 -I - "$PROFILES_DECODED" <<'PY'
+          import datetime, glob, hashlib, os, plistlib, sys
+
+          team = os.environ["APPLE_TEAM_ID"]
+          sha1 = os.environ["DIST_CERT_SHA1"].upper()
+          wanted = [p.split("=", 1) for p in os.environ["PROVISIONING_PROFILES"].split(";") if p.strip()]
+          now = datetime.datetime.now(datetime.timezone.utc)
+
+          profiles = []
+          for path in sorted(glob.glob(os.path.join(sys.argv[1], "*.plist"))):
+              with open(path, "rb") as f:
+                  profiles.append(plistlib.load(f))
+
+          print("Installed provisioning profiles:")
+          for p in profiles:
+              ent = p.get("Entitlements", {})
+              kind = ("development/ad hoc" if p.get("ProvisionedDevices") else
+                      "enterprise" if p.get("ProvisionsAllDevices") else
+                      "development" if ent.get("get-task-allow") else "app store")
+              print(f"  '{p['Name']}'  {p['UUID']}  {ent.get('application-identifier', '?')}  "
+                    f"{kind}  expires {p['ExpirationDate']:%Y-%m-%d}")
+          print()
+
+          errors = []
+          for bundle, name in wanted:
+              bundle, name = bundle.strip(), name.strip()
+              matches = [p for p in profiles if p.get("Name") == name]
+              if not matches:
+                  errors.append(f"No installed profile is named '{name}' (for {bundle}). "
+                                "Re-download it and refresh APPLE_PROVISIONING_PROFILES.")
+                  continue
+              if len(matches) > 1:
+                  errors.append(f"{len(matches)} installed profiles are named '{name}'; keep only the newest in APPLE_PROVISIONING_PROFILES.")
+                  continue
+              p = matches[0]
+              ent = p.get("Entitlements", {})
+              app_id = ent.get("application-identifier", "")
+              expires = p["ExpirationDate"]
+              if expires.tzinfo is None:
+                  expires = expires.replace(tzinfo=datetime.timezone.utc)
+              certs = {hashlib.sha1(c).hexdigest().upper() for c in p.get("DeveloperCertificates", [])}
+              problems = []
+              if team not in p.get("TeamIdentifier", []):
+                  problems.append(f"belongs to team {p.get('TeamIdentifier')}, not APPLE_TEAM_ID")
+              if app_id not in (f"{team}.{bundle}", f"{team}.*"):
+                  problems.append(f"is for App ID '{app_id}', not '{team}.{bundle}'")
+              if p.get("ProvisionedDevices") or p.get("ProvisionsAllDevices") or ent.get("get-task-allow"):
+                  problems.append("is not an App Store profile (create it under Distribution → App Store Connect)")
+              if expires <= now:
+                  problems.append(f"expired on {expires:%Y-%m-%d}")
+              if sha1 not in certs:
+                  problems.append("does not include the Apple Distribution certificate in APPLE_DIST_CERT_P12 "
+                                  "(edit the profile on developer.apple.com, tick that certificate, re-download)")
+              if problems:
+                  errors.append(f"Profile '{name}' " + "; ".join(problems) + ".")
+              else:
+                  print(f"ok  {bundle} -> '{name}'")
+
+          for e in errors:
+              print(f"::error::{e}")
+          sys.exit(1 if errors else 0)
+          PY
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/asc_key.p8"
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Resolve version and build number
+        env:
+          INPUT_MARKETING_VERSION: ${{ inputs.marketing_version }}
+          INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
+          # Keeps CI build numbers above the ones already used by hand.
+          # Raise this repository variable if a manual upload ever overtakes CI.
+          BUILD_NUMBER_OFFSET: ${{ vars.BUILD_NUMBER_OFFSET || '100' }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "$INPUT_MARKETING_VERSION" ]; then
+            MARKETING_VERSION="$INPUT_MARKETING_VERSION"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            MARKETING_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            # Whatever the project itself is configured with. Works for both
+            # hand-maintained and generated projects, unlike parsing pbxproj.
+            MARKETING_VERSION="$(
+              xcodebuild -showBuildSettings \
+                "$PROJECT_FLAG" "$XCODE_PROJECT" \
+                -scheme "$XCODE_SCHEME" \
+                -configuration Release \
+              | awk -F' = ' '/^ *MARKETING_VERSION = /{print $2; exit}'
+            )"
+          fi
+
+          if [ -z "$MARKETING_VERSION" ]; then
+            echo "::error::Could not determine a marketing version. Set MARKETING_VERSION in the project, or pass marketing_version when running the workflow."
+            exit 1
+          fi
+
+          if [ -n "$INPUT_BUILD_NUMBER" ]; then
+            BUILD_NUMBER="$INPUT_BUILD_NUMBER"
+          else
+            BUILD_NUMBER="$(( BUILD_NUMBER_OFFSET + GITHUB_RUN_NUMBER ))"
+          fi
+
+          echo "MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Building $MARKETING_VERSION ($BUILD_NUMBER)"
+
+      - name: Prepare export options
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          cp ci/ExportOptions.plist "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -replace teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -replace method -string "$EXPORT_METHOD" "$RUNNER_TEMP/ExportOptions.plist"
+
+          # Sign against the named profiles explicitly; never ask Apple to
+          # conjure signing assets.
+          plutil -replace signingStyle -string manual "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -replace signingCertificate -string "$SIGNING_CERTIFICATE" "$RUNNER_TEMP/ExportOptions.plist"
+          plutil -replace provisioningProfiles -json '{}' "$RUNNER_TEMP/ExportOptions.plist"
+
+          # Archive-time overrides, one per line, read back with a read loop (macOS bash 3.2 has no mapfile) by
+          # the next two steps. A command-line build setting applies to
+          # every target, but each bundle needs its own profile, so the
+          # specifier indirects through a per-bundle setting:
+          #   PROVISIONING_PROFILE_SPECIFIER = $(CI_PROFILE_<bundle id as C identifier>)
+          # Targets without an entry (frameworks, Swift packages) resolve to
+          # empty, which is what they need. "Verify archive signing
+          # settings" checks the resolved values before the archive runs.
+          OVERRIDES="$RUNNER_TEMP/signing-overrides"
+          {
+            echo "CODE_SIGN_STYLE=Manual"
+            echo "CODE_SIGN_IDENTITY=$SIGNING_CERTIFICATE"
+            echo "DEVELOPMENT_TEAM=$APPLE_TEAM_ID"
+            echo 'PROVISIONING_PROFILE_SPECIFIER=$(CI_PROFILE_$(PRODUCT_BUNDLE_IDENTIFIER:c99extidentifier))'
+          } > "$OVERRIDES"
+
+          while IFS= read -r pair; do
+            [ -n "$pair" ] || continue
+            bundle="${pair%%=*}"
+            profile="${pair#*=}"
+            # plutil key paths split on dots, and bundle IDs are full of
+            # them; without escaping it silently writes a nested dict.
+            escaped="${bundle//./\\.}"
+            plutil -replace "provisioningProfiles.$escaped" -string "$profile" "$RUNNER_TEMP/ExportOptions.plist"
+            # Same transform as Xcode's :c99extidentifier for a bundle ID.
+            key="$(printf '%s' "$bundle" | sed 's/[^A-Za-z0-9_]/_/g; s/^[0-9]/_&/')"
+            echo "CI_PROFILE_$key=$profile" >> "$OVERRIDES"
+            echo "  $bundle -> $profile"
+          # The trailing newline matters: without it `read` returns
+          # non-zero on the final pair and the loop drops it.
+          done < <(printf '%s\n' "$PROVISIONING_PROFILES" | tr ';' '\n')
+
+          # Same options, but exportArchive hands the build to App Store
+          # Connect instead of writing an .ipa.
+          cp "$RUNNER_TEMP/ExportOptions.plist" "$RUNNER_TEMP/ExportOptionsUpload.plist"
+          plutil -replace destination -string upload "$RUNNER_TEMP/ExportOptionsUpload.plist"
+
+      # Costs seconds and catches a mis-resolved specifier, an app target
+      # with no profile, or a project setting that beats the override —
+      # instead of a signing error halfway through the archive.
+      - name: Verify archive signing settings
+        run: |
+          set -euo pipefail
+          OVERRIDES=()
+          while IFS= read -r line; do OVERRIDES+=("$line"); done < "$RUNNER_TEMP/signing-overrides"
+          xcodebuild -showBuildSettings -json \
+            "$PROJECT_FLAG" "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=$PLATFORM" \
+            "${OVERRIDES[@]}" > "$RUNNER_TEMP/build-settings.json"
+          python3 -I - "$RUNNER_TEMP/build-settings.json" <<'PY'
+          import json, os, sys
+
+          wanted = dict(p.split("=", 1) for p in os.environ["PROVISIONING_PROFILES"].split(";") if p.strip())
+          wanted = {k.strip(): v.strip() for k, v in wanted.items()}
+          cert = os.environ["SIGNING_CERTIFICATE"]
+          errors, seen = [], set()
+          for entry in json.load(open(sys.argv[1])):
+              target, bs = entry.get("target", "?"), entry.get("buildSettings", {})
+              bundle = bs.get("PRODUCT_BUNDLE_IDENTIFIER", "")
+              spec = bs.get("PROVISIONING_PROFILE_SPECIFIER", "")
+              signed = bs.get("WRAPPER_EXTENSION") in ("app", "appex")
+              print(f"  {target:40} {bundle or '-':45} style={bs.get('CODE_SIGN_STYLE')} "
+                    f"identity={bs.get('CODE_SIGN_IDENTITY')!r} profile={spec!r}")
+              if bundle in wanted:
+                  seen.add(bundle)
+                  if spec != wanted[bundle]:
+                      errors.append(f"{target}: profile resolved to '{spec}', expected '{wanted[bundle]}'.")
+                  if bs.get("CODE_SIGN_STYLE") != "Manual" or bs.get("CODE_SIGN_IDENTITY") != cert:
+                      errors.append(f"{target}: not resolving to Manual / '{cert}' signing.")
+              elif signed and bundle:
+                  errors.append(f"{target} ({bundle}) is an app/extension with no entry in PROVISIONING_PROFILES in ci/release.config.")
+          for bundle in sorted(set(wanted) - seen):
+              print(f"::warning::PROVISIONING_PROFILES names {bundle}, but no target in scheme builds it.")
+          for e in errors:
+              print(f"::error::{e}")
+          sys.exit(1 if errors else 0)
+          PY
+
+      # Manual signing and no -allowProvisioningUpdates: this step cannot
+      # create certificates, profiles or App IDs. If something is missing
+      # it fails, which is the point.
+      - name: Archive
+        run: |
+          set -euo pipefail
+          OVERRIDES=()
+          while IFS= read -r line; do OVERRIDES+=("$line"); done < "$RUNNER_TEMP/signing-overrides"
+          xcodebuild archive \
+            "$PROJECT_FLAG" "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=$PLATFORM" \
+            -archivePath "$ARCHIVE_PATH" \
+            MARKETING_VERSION="$MARKETING_VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            "${OVERRIDES[@]}"
+
+          echo "Signing authority of archived apps:"
+          while IFS= read -r -d '' app; do
+            echo "  ${app#"$ARCHIVE_PATH"/}: $(codesign -dvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+          done < <(find "$ARCHIVE_PATH/Products" -name '*.app' -print0)
+
+      # Offline: re-signs with the same certificate and profiles.
+      - name: Export
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$EXPORT_PATH"
+          ls -la "$EXPORT_PATH"
+
+      # -allowProvisioningUpdates is kept here only so xcodebuild uses the
+      # API key to talk to App Store Connect. With signingStyle manual it
+      # can at most download a profile; it does not create certificates.
+      - name: Upload to App Store Connect
+        if: ${{ !inputs.dry_run }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptionsUpload.plist" \
+            -exportPath "$RUNNER_TEMP/upload" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo "### ${XCODE_SCHEME:-app} → TestFlight"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${MARKETING_VERSION:-?} (${BUILD_NUMBER:-?})\` |"
+            echo "| Platform | \`${PLATFORM:-?}\` |"
+            echo "| Commit | \`${GITHUB_SHA:0:8}\` |"
+            echo "| Uploaded | ${{ inputs.dry_run && 'no (dry run)' || 'yes' }} |"
+            echo
+            echo "Apple takes a few minutes to process the build before it shows up in TestFlight."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ env.MARKETING_VERSION }}-${{ env.BUILD_NUMBER }}
+          path: |
+            ${{ github.workspace }}/build/export/*.ipa
+            ${{ github.workspace }}/build/export/*.pkg
+            ${{ github.workspace }}/build/export/DistributionSummary.plist
+            ${{ github.workspace }}/build/export/Packaging.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Tear down keychain
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "${ASC_KEY_PATH:-}"
+          if [ -n "${TEAM_XCCONFIG:-}" ]; then rm -f "$TEAM_XCCONFIG"; fi
+          if [ -n "${SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$SIGNING_KEYCHAIN" || true
+          fi

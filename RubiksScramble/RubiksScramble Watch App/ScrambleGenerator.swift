@@ -32,3 +32,47 @@ enum ScrambleGenerator {
         generate(length: length).joined(separator: " ")
     }
 }
+
+/// The puzzles the app can scramble.
+enum Puzzle: String, CaseIterable, Identifiable {
+    case cube3x3
+    case square1
+
+    var id: Self { self }
+
+    var name: String {
+        switch self {
+        case .cube3x3: "3×3"
+        case .square1: "Square-1"
+        }
+    }
+
+    var defaultLength: Int {
+        switch self {
+        case .cube3x3: ScrambleGenerator.defaultLength
+        case .square1: Square1Scrambler.defaultSlices
+        }
+    }
+
+    var lengthRange: ClosedRange<Int> {
+        switch self {
+        case .cube3x3: 1...50
+        case .square1: 1...30
+        }
+    }
+
+    /// 3×3 length counts face turns; Square-1 length counts slices.
+    var lengthLabel: String {
+        switch self {
+        case .cube3x3: "Length"
+        case .square1: "Slices"
+        }
+    }
+
+    func generate(length: Int) -> [String] {
+        switch self {
+        case .cube3x3: ScrambleGenerator.generate(length: length)
+        case .square1: Square1Scrambler.generate(slices: length)
+        }
+    }
+}
