@@ -380,9 +380,25 @@ private struct AlgoDrillView: View {
     }
 
     private func motionStop(atUptime spike: TimeInterval) {
-        guard phase == .running,
-              spike >= runStartUptime + TimerCard.startLockout else { return }
-        finish(elapsed: spike - runStartUptime)
+        guard phase == .running else { return }
+        // Wall-clock based (the uptime clock does not count device sleep).
+        let sinceSpike = max(0, ProcessInfo.processInfo.systemUptime - spike)
+        let elapsed = Date().timeIntervalSince(runStart) - sinceSpike
+        guard elapsed >= TimerCard.startLockout else { return }
+        finish(elapsed: elapsed)
+    }
+
+    /// Foreground again mid-run (screen slept / clock shown): the run is just
+    /// `runStart`, so re-arm the extended session and the slap detector.
+    private func resumeRun() {
+        guard phase == .running else { return }
+        detector.stop()
+        runtime.start()
+        runStartUptime = ProcessInfo.processInfo.systemUptime
+            - max(0, Date().timeIntervalSince(runStart))
+        detector.start(runStart: runStartUptime) { spike in
+            motionStop(atUptime: spike)
+        }
     }
 
     private func tapStop() {
@@ -574,12 +590,16 @@ private struct AlgoDrillView: View {
         .onChange(of: phase) { _, new in
             if new == .reveal { play(.click) }
         }
-        // Backgrounding aborts a run unless the extended runtime session is
-        // keeping the app alive (wrist down), as in the Timer card.
+        // Without a live extended runtime session, backgrounding only pauses
+        // the detector; the run (a start Date) resumes with the right elapsed
+        // time when the app is active again.
         .onChange(of: scenePhase) { _, new in
-            if new != .active, phase == .running,
-               !runtime.isRunning, !runtime.isActiveOrStarting {
-                abort()
+            if new == .active {
+                resumeRun()
+            } else if phase == .running,
+                      !runtime.isRunning, !runtime.isActiveOrStarting {
+                detector.stop()
+                runtime.stop()
             }
         }
     }
