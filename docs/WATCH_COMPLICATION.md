@@ -7,9 +7,15 @@ the app. Customizable which scramble."
 ## Behaviour
 
 - Families: `accessoryCircular`, `accessoryRectangular`, `accessoryCorner`,
-  `accessoryInline`. Each shows an SF Symbol (`cube.fill` for 3x3,
-  `square.split.diagonal` for Square-1) in the puzzle's card colour, plus its
-  name. Colours come from `Puzzle.cardColor`, so the app and the face agree.
+  `accessoryInline`. Circular, rectangular and corner
+  draw the puzzle with SwiftUI `Canvas` paths (`PuzzleArt`): an isometric
+  three-face cube for 3x3 (rectangular title "3×3 Cube") and a top view of kite
+  (corner) and edge pieces with coloured rims for Square-1. Colours come from
+  `CubeFace.stickerColor`; in tinted/vibrant rendering the same pieces are drawn
+  in greys (luminance differences) and the art is `widgetAccentable`. Inline can
+  only show text and SF Symbols, so it keeps `cube.fill` /
+  `square.split.diagonal` plus the name. Card colours still come from
+  `Puzzle.cardColor`.
 - Long-press the face, tap Edit, tap the complication, and pick **Puzzle**: 3x3
   or Square-1. The gallery also lists both as ready-made suggestions.
 - Tapping it opens the app straight on that puzzle's page.

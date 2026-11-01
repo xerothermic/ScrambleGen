@@ -277,11 +277,14 @@ private struct CardStack: View {
 
     var body: some View {
         // Crown / touch scrolls the stack. Cards overlap via negative spacing,
-        // later cards on top; scrollTransition tilts each card in perspective
+        // later cards on top (About first, 3x3 last); scrollTransition tilts each card in perspective
         // (like Wallet) as it nears the top or bottom edge.
         ScrollView {
             VStack(spacing: peek - cardHeight) {
-                ForEach(Puzzle.allCases, id: \.self) { option in
+                // About is the back card (top of the screen); the 3x3 card is
+                // the front card and sits fully visible at the bottom.
+                aboutCard
+                ForEach(Array(Puzzle.allCases.reversed()), id: \.self) { option in
                     Button {
                         onPick(option)
                     } label: {
@@ -328,7 +331,6 @@ private struct CardStack: View {
                     }
                     .accessibilityLabel("\(option.name) scramble")
                 }
-                aboutCard.zIndex(10)
             }
             .padding(.horizontal, 4)
             .padding(.top, 6)
