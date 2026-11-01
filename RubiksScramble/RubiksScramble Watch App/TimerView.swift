@@ -31,7 +31,8 @@ enum TimerCard {
     /// Motion sampling interval (50 Hz).
     static let sampleInterval: TimeInterval = 1.0 / 50.0
 
-    /// Solve times kept for the session (in memory only).
+    /// Solve times kept for the session list on the result screen (the full
+    /// history lives in SolveStore).
     static let maxSolves = 20
     static let solvesKey = "timerSolves"
     static let totalKey = "timerSolveTotal"
@@ -323,6 +324,7 @@ struct TimerScreen: View {
         }
         total = max(total, solves.count - 1) + 1
         TimerCard.saveSolves(solves)
+        SolveStore.shared.add(time: finalTime, hasMotion: false)
         timerLog.info("solve saved, count \(solves.count, privacy: .public), total \(total, privacy: .public)")
         phase = .done
         WKInterfaceDevice.current().play(.stop)
@@ -393,6 +395,7 @@ struct TimerScreen: View {
             isHapticFeedbackEnabled: true
         )
         .onChange(of: crown) { _, v in countdown = Int(v.rounded()) }
+        .toolbar { statsLink }
         .onAppear {
             crown = Double(seconds)
             crownFocused = true
@@ -501,11 +504,26 @@ struct TimerScreen: View {
                     solves = []
                     total = 0
                     TimerCard.saveSolves([])
+                    // History is kept; Reset only starts a new session.
+                    SolveStore.shared.startNewSession()
                     reset()
                 }
                 .font(.system(size: 14, weight: .medium))
             }
             .padding(.horizontal, 4)
+        }
+        .toolbar { statsLink }
+    }
+
+    /// Top-corner entry to the stats / history / settings hub.
+    private var statsLink: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            NavigationLink {
+                StatsHubView()
+            } label: {
+                Image(systemName: "chart.xyaxis.line")
+            }
+            .accessibilityLabel("Stats")
         }
     }
 
