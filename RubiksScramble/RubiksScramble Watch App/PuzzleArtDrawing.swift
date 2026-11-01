@@ -54,6 +54,109 @@ enum PuzzleArtDrawing {
                        style: StrokeStyle(lineWidth: lineWidth, lineJoin: .round))
     }
 
+    // MARK: Timer (stopwatch)
+
+    /// Stopwatch geometry shared by the colour and line-art versions.
+    private static func stopwatch(_ size: CGSize) -> (center: CGPoint, radius: CGFloat) {
+        let side = min(size.width, size.height)
+        return (CGPoint(x: size.width / 2, y: size.height / 2 + side * 0.05), side * 0.33)
+    }
+
+    /// Straight bar of `width` from radius r0 to r1 at `degrees` (0 = 12 o'clock,
+    /// clockwise) around `center`.
+    private static func bar(_ center: CGPoint, degrees: Double, from r0: CGFloat,
+                            to r1: CGFloat, width: CGFloat) -> [CGPoint] {
+        let a = (degrees - 90) * Double.pi / 180
+        let d = CGPoint(x: CGFloat(cos(a)), y: CGFloat(sin(a)))
+        let n = CGPoint(x: -d.y * width / 2, y: d.x * width / 2)
+        let p0 = CGPoint(x: center.x + d.x * r0, y: center.y + d.y * r0)
+        let p1 = CGPoint(x: center.x + d.x * r1, y: center.y + d.y * r1)
+        return [CGPoint(x: p0.x + n.x, y: p0.y + n.y), CGPoint(x: p1.x + n.x, y: p1.y + n.y),
+                CGPoint(x: p1.x - n.x, y: p1.y - n.y), CGPoint(x: p0.x - n.x, y: p0.y - n.y)]
+    }
+
+    private static func crown(_ center: CGPoint, _ radius: CGFloat) -> [CGPoint] {
+        let w = radius * 0.46
+        let top = center.y - radius * 1.32
+        return [CGPoint(x: center.x - w / 2, y: top), CGPoint(x: center.x + w / 2, y: top),
+                CGPoint(x: center.x + w / 2, y: center.y - radius * 0.9),
+                CGPoint(x: center.x - w / 2, y: center.y - radius * 0.9)]
+    }
+
+    /// Full colour: light case, blue face (the Timer card's colour), white
+    /// ticks and hand with a red tip.
+    static func drawTimerColour(_ context: inout GraphicsContext, size: CGSize) {
+        let (center, radius) = stopwatch(size)
+        let lineWidth = max(0.6, min(size.width, size.height) * 0.012)
+        let stroke = StrokeStyle(lineWidth: lineWidth, lineJoin: .round)
+        paint(&context, crown(center, radius), color: Color(hex: 0xDADADA), lineWidth: lineWidth)
+        paint(&context, bar(center, degrees: 45, from: radius * 0.95, to: radius * 1.25,
+                            width: radius * 0.26),
+              color: Color(hex: 0xDADADA), lineWidth: lineWidth)
+        let body = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
+                                          width: radius * 2, height: radius * 2))
+        context.fill(body, with: .color(Color(hex: 0xDADADA)))
+        context.stroke(body, with: .color(.black), style: stroke)
+        let r = radius * 0.8
+        let face = Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r,
+                                          width: r * 2, height: r * 2))
+        context.fill(face, with: .color(Color(red: 0.04, green: 0.45, blue: 0.92)))
+        context.stroke(face, with: .color(.black), style: StrokeStyle(lineWidth: lineWidth * 0.8))
+        for i in 0..<12 {
+            let major = i % 3 == 0
+            context.fill(polygon(bar(center, degrees: Double(i) * 30, from: r * (major ? 0.72 : 0.82),
+                                     to: r * 0.94, width: radius * (major ? 0.08 : 0.05))),
+                         with: .color(.white))
+        }
+        paint(&context, bar(center, degrees: 60, from: -r * 0.12, to: r * 0.7, width: radius * 0.1),
+              color: .white, lineWidth: lineWidth * 0.6)
+        paint(&context, bar(center, degrees: 60, from: r * 0.4, to: r * 0.7, width: radius * 0.1),
+              color: Color(hex: 0xCE2029), lineWidth: lineWidth * 0.6)
+        let hub = radius * 0.1
+        context.fill(Path(ellipseIn: CGRect(x: center.x - hub, y: center.y - hub,
+                                            width: hub * 2, height: hub * 2)),
+                     with: .color(.white))
+    }
+
+    /// Line art. Layer 0 = case ring, crown and side button (opacity 1.0),
+    /// 1 = ticks, hand and hub (0.6), 2 = elapsed wedge (0.32).
+    static func drawTimerLine(_ context: inout GraphicsContext, size: CGSize, layer: Int) {
+        let (center, radius) = stopwatch(size)
+        let ring = radius * 0.17
+        func circle(_ r: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
+        }
+        switch layer {
+        case 0:
+            var path = circle(radius)
+            path.addPath(circle(radius - ring))
+            context.fill(path, with: .color(.white), style: FillStyle(eoFill: true))
+            context.fill(polygon(inset(crown(center, radius), 0.9)), with: .color(.white))
+            context.fill(polygon(bar(center, degrees: 45, from: radius * 1.08, to: radius * 1.3,
+                                     width: radius * 0.24)),
+                         with: .color(.white))
+        case 1:
+            let r = radius - ring * 1.6
+            for i in 0..<4 {
+                context.fill(polygon(bar(center, degrees: Double(i) * 90, from: r * 0.78,
+                                         to: r, width: radius * 0.1)),
+                             with: .color(Color.white.opacity(0.6)))
+            }
+            context.fill(polygon(bar(center, degrees: 60, from: -r * 0.12, to: r * 0.78,
+                                     width: radius * 0.1)),
+                         with: .color(Color.white.opacity(0.6)))
+            context.fill(circle(radius * 0.11), with: .color(Color.white.opacity(0.6)))
+        default:
+            var wedge = Path()
+            let r = radius - ring * 1.6
+            wedge.move(to: center)
+            wedge.addArc(center: center, radius: r * 0.7, startAngle: .degrees(-90),
+                         endAngle: .degrees(-30), clockwise: false)
+            wedge.closeSubpath()
+            context.fill(wedge, with: .color(Color.white.opacity(0.32)))
+        }
+    }
+
     // MARK: 3x3
 
     static let cubeTop: [CubeFace] =

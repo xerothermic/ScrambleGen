@@ -162,13 +162,18 @@ struct ContentView: View {
             }
         }
         // Complication tap: scramblegen://puzzle/<slug> opens that puzzle's
-        // page, same state change as tapping its wallet card.
+        // page, scramblegen://timer the Timer card; same state changes as
+        // tapping the wallet cards.
         .onOpenURL { url in
-            guard let target = Puzzle(deepLink: url) else { return }
-            puzzle = target
+            guard let target = ComplicationTarget(deepLink: url) else { return }
             showAbout = false
-            showTimer = false
-            withAnimation(Self.spring) { openPuzzle = target }
+            if let target = target.puzzle {
+                puzzle = target
+                showTimer = false
+                withAnimation(Self.spring) { openPuzzle = target }
+            } else {
+                withAnimation(Self.spring) { openPuzzle = nil; showTimer = true }
+            }
         }
         .onAppear {
             for option in Puzzle.allCases where moves[option] == nil {

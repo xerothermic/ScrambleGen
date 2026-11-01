@@ -330,7 +330,7 @@ struct TimerScreen: View {
                 .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text("\(seconds)")
-                    .font(.system(size: 60, weight: .bold, design: .rounded))
+                    .font(.system(size: 52, weight: .bold, design: .rounded))
                     .monospacedDigit()
                 Text("s")
                     .font(.system(size: 20, weight: .semibold))
@@ -341,12 +341,17 @@ struct TimerScreen: View {
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            Text("Tap to start")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.accentColor))
+            // Big Start button: >= 44 pt tall and wide (the whole screen also
+            // starts it); the digits are 52 pt so it still fits a 40 mm screen.
+            Button { beginCountdown() } label: {
+                Text("Start")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 110, minHeight: 44)
+                    .background(Capsule().fill(Color.accentColor))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
