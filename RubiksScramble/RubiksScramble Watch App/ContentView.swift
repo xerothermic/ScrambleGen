@@ -410,6 +410,8 @@ private struct ScrambleScreen: View {
     @State private var isSelected = false
     private var lengthFocused: Bool { isSelected }
 
+    private static let topID = "scrambleTop"
+
     private var length: Int { lengths[puzzle] ?? puzzle.defaultLength }
 
     /// Where `length` sits within the puzzle's range, 0...1, for the meter.
@@ -445,6 +447,7 @@ private struct ScrambleScreen: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 12) {
                     // 3×3: the standard WCA scrambling orientation, with the
@@ -460,6 +463,7 @@ private struct ScrambleScreen: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(Color.accentColor))
+                        .id(Self.topID)
 
                     Text(scrambleRows)
                         .font(.system(size: puzzle == .cube3x3 ? 19 : 16,
@@ -540,6 +544,10 @@ private struct ScrambleScreen: View {
                     Button {
                         moves[puzzle] = puzzle.generate(length: length)
                         isSelected = false
+                        // Show the new move list from its first move.
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            proxy.scrollTo(Self.topID, anchor: .top)
+                        }
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
                             .font(.system(size: 17, weight: .semibold))
@@ -557,6 +565,7 @@ private struct ScrambleScreen: View {
                     .padding(.top, 2)
                 }
                 .padding(.horizontal, 4)
+            }
             }
             .modifier(CloseAwareTitle(title: puzzle.name))
         }
