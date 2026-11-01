@@ -11,6 +11,7 @@ struct ContentView: View {
 
     // nil = the Wallet-style card stack; otherwise the open puzzle.
     @State private var openPuzzle: Puzzle?
+    @State private var showAbout = false
     @Namespace private var cardSpace
 
     // Close affordance: invisible until the screen is touched, then a small
@@ -24,7 +25,7 @@ struct ContentView: View {
     private func close() {
         hideTask?.cancel()
         showClose = false
-        withAnimation(Self.spring) { openPuzzle = nil }
+        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false }
     }
 
     private func scheduleHide() {
@@ -48,17 +49,27 @@ struct ContentView: View {
         scheduleHide()
     }
 
+    @ViewBuilder
+    private var openContent: some View {
+        if let open = openPuzzle {
+            PuzzlePage(puzzle: open, lengths: $lengths, moves: $moves,
+                       page: Binding(get: { pages[open] ?? 0 },
+                                     set: { pages[open] = $0 }))
+        } else {
+            AboutView()
+        }
+    }
+
     var body: some View {
         Group {
-            if let open = openPuzzle {
-                PuzzlePage(puzzle: open, lengths: $lengths, moves: $moves,
-                           page: Binding(get: { pages[open] ?? 0 },
-                                         set: { pages[open] = $0 }))
+            if openPuzzle != nil || showAbout {
+                openContent
                     .background(
                         // The tapped card grows into this tinted full-screen panel.
                         RoundedRectangle(cornerRadius: 18)
-                            .fill(open.cardColor.opacity(0.35))
-                            .matchedGeometryEffect(id: open, in: cardSpace)
+                            .fill((openPuzzle?.cardColor ?? AboutCard.color).opacity(0.35))
+                            .matchedGeometryEffect(id: openPuzzle?.rawValue ?? AboutCard.id,
+                                                   in: cardSpace)
                             .ignoresSafeArea()
                     )
                     // Any touch reveals the close button. simultaneousGesture
@@ -98,10 +109,12 @@ struct ContentView: View {
                     }
                     .transition(.opacity)
             } else {
-                CardStack(lastUsed: puzzle, space: cardSpace) { option in
+                CardStack(lastUsed: puzzle, space: cardSpace, onPick: { option in
                     puzzle = option
                     withAnimation(Self.spring) { openPuzzle = option }
-                }
+                }, onAbout: {
+                    withAnimation(Self.spring) { showAbout = true }
+                })
                 .transition(.opacity)
             }
         }
@@ -119,6 +132,7 @@ private struct CardStack: View {
     let lastUsed: Puzzle
     let space: Namespace.ID
     let onPick: (Puzzle) -> Void
+    let onAbout: () -> Void
 
     private let cardHeight: CGFloat = 120
     private let peek: CGFloat = 64
@@ -175,6 +189,52 @@ private struct CardStack: View {
         }
     }
 
+    private var aboutCard: some View {
+        Button(action: onAbout) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("About")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Version \(AboutCard.versionString)")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "info.circle")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [AboutCard.color, AboutCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: AboutCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -22),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.06)
+                .opacity(1 - abs(phase.value) * 0.25)
+        }
+        .accessibilityLabel("About, version \(AboutCard.versionString)")
+    }
+
     var body: some View {
         // Crown / touch scrolls the stack. Cards overlap via negative spacing,
         // later cards on top; scrollTransition tilts each card in perspective
@@ -206,7 +266,7 @@ private struct CardStack: View {
                                 .fill(LinearGradient(
                                     colors: [color(option), color(option).opacity(0.75)],
                                     startPoint: .top, endPoint: .bottom))
-                                .matchedGeometryEffect(id: option, in: space)
+                                .matchedGeometryEffect(id: option.rawValue, in: space)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
@@ -229,9 +289,47 @@ private struct CardStack: View {
                     }
                     .accessibilityLabel("\(option.name) scramble")
                 }
+                aboutCard
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 6)
+        }
+    }
+}
+
+enum AboutCard {
+    static let id = "about"
+    static let color = Color(red: 0.35, green: 0.35, blue: 0.42)
+
+    /// "1.1 (3)", read from the bundle at runtime.
+    static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let v = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(v) (\(b))"
+    }
+}
+
+private struct AboutView: View {
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 30, weight: .light))
+                Text("Watch Scramble")
+                    .font(.headline)
+                Text("Version \(AboutCard.versionString)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text("3×3 and Square-1 scrambles with puzzle maps.")
+                    .font(.caption2)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 24)
+            .padding(.horizontal, 8)
         }
     }
 }
