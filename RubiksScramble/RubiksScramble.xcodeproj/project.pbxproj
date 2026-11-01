@@ -27,6 +27,10 @@
 		CC0000000000000000000016 /* ScrambleWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000003 /* ScrambleWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA0000000000000000000031 /* PuzzleArtDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000030 /* PuzzleArtDrawing.swift */; };
 		CC0000000000000000000031 /* PuzzleArtDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000030 /* PuzzleArtDrawing.swift */; };
+		AA0000000000000000000033 /* AlgoArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* AlgoArt.swift */; };
+		AA0000000000000000000035 /* AlgoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000034 /* AlgoData.swift */; };
+		AA0000000000000000000037 /* AlgoScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000036 /* AlgoScreens.swift */; };
+		AA0000000000000000000039 /* AlgoCases.json in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000038 /* AlgoCases.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +93,10 @@
 		CC0000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CC0000000000000000000003 /* ScrambleWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ScrambleWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000030 /* PuzzleArtDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuzzleArtDrawing.swift; sourceTree = "<group>"; };
+		AA0000000000000000000032 /* AlgoArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoArt.swift; sourceTree = "<group>"; };
+		AA0000000000000000000034 /* AlgoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoData.swift; sourceTree = "<group>"; };
+		AA0000000000000000000036 /* AlgoScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoScreens.swift; sourceTree = "<group>"; };
+		AA0000000000000000000038 /* AlgoCases.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = AlgoCases.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -141,6 +149,10 @@
 				AA000000000000000000001C /* Square1Scrambler.swift */,
 				AA000000000000000000001E /* Square1MapView.swift */,
 				AA0000000000000000000024 /* TimerView.swift */,
+				AA0000000000000000000032 /* AlgoArt.swift */,
+				AA0000000000000000000034 /* AlgoData.swift */,
+				AA0000000000000000000036 /* AlgoScreens.swift */,
+				AA0000000000000000000038 /* AlgoCases.json */,
 				AA0000000000000000000016 /* Assets.xcassets */,
 				AA0000000000000000000020 /* PrivacyInfo.xcprivacy */,
 			);
@@ -259,6 +271,7 @@
 			files = (
 				AA0000000000000000000017 /* Assets.xcassets in Resources */,
 				AA0000000000000000000021 /* PrivacyInfo.xcprivacy in Resources */,
+				AA0000000000000000000039 /* AlgoCases.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -286,6 +299,9 @@
 				AA0000000000000000000025 /* TimerView.swift in Sources */,
 				AA0000000000000000000023 /* PuzzleStyle.swift in Sources */,
 				AA0000000000000000000031 /* PuzzleArtDrawing.swift in Sources */,
+				AA0000000000000000000033 /* AlgoArt.swift in Sources */,
+				AA0000000000000000000035 /* AlgoData.swift in Sources */,
+				AA0000000000000000000037 /* AlgoScreens.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
