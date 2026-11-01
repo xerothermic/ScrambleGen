@@ -83,6 +83,7 @@ final class SolveStore: ObservableObject {
         fileURL = dir.appendingPathComponent("solves.json")
         load()
         migrateLegacyIfNeeded()
+        pruneMotion()
     }
 
     var session: Int {
@@ -100,6 +101,7 @@ final class SolveStore: ObservableObject {
                             session: session, hasMotion: hasMotion ? true : nil, imported: nil)
         records.append(r)
         trimToCap()
+        pruneMotion()
         save()
         return r
     }
@@ -123,6 +125,22 @@ final class SolveStore: ObservableObject {
     }
 
     func startNewSession() { session += 1 }
+
+    /// Keeps raw motion files for the newest `MotionStore.maxFiles` solves that
+    /// have one; older files are deleted (their pause stats stay on the record).
+    func pruneMotion() {
+        var kept = 0
+        var keep = Set<UUID>()
+        for i in records.indices.reversed() where records[i].hasMotion == true {
+            if kept < MotionStore.maxFiles {
+                kept += 1
+                keep.insert(records[i].id)
+            } else {
+                records[i].hasMotion = nil
+            }
+        }
+        MotionStore.shared.prune(keeping: keep)
+    }
 
     private func trimToCap() {
         if records.count > Self.cap { records.removeFirst(records.count - Self.cap) }

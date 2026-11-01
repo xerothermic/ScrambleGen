@@ -81,6 +81,10 @@ final class StopDetector {
     private var lastSpikeAt: TimeInterval = 0
     private var stillSince: TimeInterval?
     private var fired = false
+    /// Optional recorder tap (Motion insights). Called for every sample AFTER
+    /// the stop logic ran, on `queue`; it never influences detection. Set it
+    /// before start().
+    var sampleSink: ((CMDeviceMotion) -> Void)?
 
     /// `onStop` runs on the main queue with the spike's uptime timestamp.
     func start(runStart: TimeInterval, onStop: @escaping (TimeInterval) -> Void) {
@@ -95,6 +99,7 @@ final class StopDetector {
         manager.startDeviceMotionUpdates(to: queue) { [weak self] motion, _ in
             guard let self = self, let motion = motion else { return }
             self.process(motion.userAcceleration, at: motion.timestamp, onStop: onStop)
+            self.sampleSink?(motion)
         }
     }
 
@@ -254,6 +259,10 @@ struct TimerScreen: View {
     @State private var countdownTask: Task<Void, Never>?
     @State private var detector = StopDetector()
     @State private var runtime = RuntimeKeeper()
+    @State private var recorder = MotionRecorder()
+    @AppStorage(MotionInsights.key) private var motionInsights = false
+    /// Experimental quiet-time result for the solve just finished.
+    @State private var lastPause: PauseResult?
 
     private var seconds: Int {
         min(max(countdown, TimerCard.countdownRange.lowerBound),
@@ -269,6 +278,7 @@ struct TimerScreen: View {
         countdownTask?.cancel()
         countdownTask = nil
         detector.stop()
+        lastPause = nil
         let total = seconds
         runtime.start()
         guard total > 0 else { beginRun(); return }
@@ -295,6 +305,13 @@ struct TimerScreen: View {
         runStart = Date()
         runStartUptime = startUptime
         phase = .running
+        if motionInsights && PremiumFeatures.isUnlocked {
+            recorder.begin(runStart: startUptime)
+            let rec = recorder
+            detector.sampleSink = { rec.append($0) }
+        } else {
+            detector.sampleSink = nil
+        }
         detector.start(runStart: startUptime) { spike in
             motionStop(atUptime: spike)
         }
@@ -324,10 +341,35 @@ struct TimerScreen: View {
         }
         total = max(total, solves.count - 1) + 1
         TimerCard.saveSolves(solves)
-        SolveStore.shared.add(time: finalTime, hasMotion: false)
+        let samples = recorder.finish()
+        let record = SolveStore.shared.add(time: finalTime, hasMotion: samples != nil)
+        if let samples = samples { analyzeMotion(samples, for: record) }
         timerLog.info("solve saved, count \(solves.count, privacy: .public), total \(total, privacy: .public)")
         phase = .done
         WKInterfaceDevice.current().play(.stop)
+    }
+
+    /// Writes the raw file and computes quiet time off the main thread, then
+    /// stores the numbers on the solve record and shows them on the result.
+    private func analyzeMotion(_ samples: [Float], for record: SolveRecord) {
+        let id = record.id, elapsed = finalTime
+        Task { @MainActor in
+            let result: PauseResult? = await Task.detached(priority: .utility) { () -> PauseResult? in
+                let data = MotionFile.encode(samples: samples, elapsed: elapsed)
+                MotionStore.shared.write(data, for: id)
+                guard let decoded = MotionFile.decode(data) else { return nil }
+                return PauseAnalyzer.analyze(decoded)
+            }.value
+            guard let result = result else { return }
+            SolveStore.shared.update(id) {
+                $0.pauseCount = result.count
+                $0.quietTotal = result.total
+                $0.longestPause = result.longest
+                $0.quietRatio = result.ratio
+                $0.startLatency = result.startLatency
+            }
+            if finalTime == elapsed, phase == .done { lastPause = result }
+        }
     }
 
     /// Back to the idle screen; stops the task, the motion manager and the
@@ -337,6 +379,7 @@ struct TimerScreen: View {
         countdownTask?.cancel()
         countdownTask = nil
         detector.stop()
+        recorder.cancel()
         runtime.stop()
         phase = .idle
     }
@@ -476,6 +519,15 @@ struct TimerScreen: View {
                          : "Best \(TimerCard.format(best))")
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
+                }
+                if motionInsights, let pause = lastPause {
+                    VStack(spacing: 0) {
+                        Text(pause.summaryLine)
+                            .font(.system(size: 12, weight: .medium))
+                        Text("experimental · wrist stillness")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Button {
                     beginCountdown()

@@ -259,7 +259,129 @@ struct SolveDetailView: View {
     }
 }
 
-/// Placeholder until phase 3.
+/// Experimental: timeline of the last motion-recorded solve (wrist activity
+/// with quiet stretches shaded) and the quiet-time trend. Wrist stillness of
+/// 0.3 s or more; says nothing about what the eyes or the cube are doing.
 struct QuietTimeView: View {
-    var body: some View { Text("Quiet time") }
+    @ObservedObject private var store = SolveStore.shared
+    @State private var timeline: [EnvelopePoint] = []
+    @State private var result: PauseResult?
+
+    private var lastMotionSolve: SolveRecord? {
+        store.records.last { $0.hasMotion == true }
+    }
+
+    private struct Loaded {
+        let timeline: [EnvelopePoint]
+        let result: PauseResult?
+    }
+
+    private struct TrendPoint: Identifiable {
+        let n: Int
+        let pct: Double
+        var id: Int { n }
+    }
+
+    private var trend: [TrendPoint] {
+        let ratios = store.records.compactMap(\.quietRatio)
+        return ratios.suffix(30).enumerated().map { TrendPoint(n: $0.offset + 1, pct: $0.element * 100) }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                Text("Experimental")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.orange)
+                if let rec = lastMotionSolve, !timeline.isEmpty {
+                    Text("Last solve \(TimerCard.format(rec.time))")
+                        .font(.system(size: 12, design: .monospaced))
+                    timelineChart(elapsed: rec.time)
+                        .frame(height: 90)
+                    if let r = result {
+                        Text(r.summaryLine)
+                            .font(.system(size: 12, weight: .medium))
+                        Text("Longest \(String(format: "%.1f", r.longest)) s · first move \(String(format: "%.1f", r.startLatency)) s")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("No motion solve yet. Time a solve with Motion insights on.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                if trend.count >= 2 {
+                    Text("Quiet time per solve (%)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Chart {
+                        ForEach(trend) { p in
+                            LineMark(x: .value("Solve", p.n), y: .value("Quiet %", p.pct))
+                                .foregroundStyle(Color.orange)
+                            PointMark(x: .value("Solve", p.n), y: .value("Quiet %", p.pct))
+                                .foregroundStyle(Color.orange)
+                                .symbolSize(14)
+                        }
+                    }
+                    .chartXAxis(.hidden)
+                    .chartYScale(domain: 0...max(30, (trend.map(\.pct).max() ?? 30) * 1.1))
+                    .frame(height: 70)
+                }
+                Text("Wrist stillness of 0.3 s or more. The watch sees your wrist, not the cube; this is not a look-ahead measurement.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                let u = MotionStore.shared.usage()
+                Text("\(u.count) recording\(u.count == 1 ? "" : "s") · \(u.bytes / 1024) KB on this watch")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+        }
+        .navigationTitle("Quiet time")
+        .task(id: lastMotionSolve?.id) { await load() }
+        .onAppear { MotionStore.shared.debugDump() }
+    }
+
+    private func timelineChart(elapsed: TimeInterval) -> some View {
+        let top = (timeline.map(\.e).max() ?? 1) * 1.1
+        return Chart {
+            ForEach(result?.spans ?? []) { s in
+                RectangleMark(xStart: .value("From", s.start), xEnd: .value("To", s.end),
+                              yStart: .value("Lo", 0), yEnd: .value("Hi", top))
+                    .foregroundStyle(Color.orange.opacity(0.35))
+            }
+            ForEach(timeline) { p in
+                AreaMark(x: .value("Time", p.t), y: .value("Motion", p.e))
+                    .foregroundStyle(TrendChart.ao5Color.opacity(0.5))
+                LineMark(x: .value("Time", p.t), y: .value("Motion", p.e))
+                    .foregroundStyle(TrendChart.ao5Color)
+            }
+        }
+        .chartXScale(domain: 0...max(1, elapsed))
+        .chartYScale(domain: 0...top)
+        .chartYAxis(.hidden)
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { v in
+                AxisValueLabel {
+                    if let d = v.as(Double.self) { Text("\(Int(d))s").font(.system(size: 9)) }
+                }
+            }
+        }
+    }
+
+    private func load() async {
+        guard let rec = lastMotionSolve else { timeline = []; result = nil; return }
+        let id = rec.id
+        let loaded: Loaded? =
+            await Task.detached(priority: .userInitiated) { () -> Loaded? in
+                guard let d = MotionStore.shared.read(id) else { return nil }
+                let env = PauseAnalyzer.envelope(d)
+                return Loaded(timeline: PauseAnalyzer.downsampled(env.t, env.e),
+                              result: PauseAnalyzer.analyze(d))
+            }.value
+        guard let loaded = loaded else { timeline = []; result = nil; return }
+        timeline = loaded.timeline
+        result = loaded.result
+    }
 }
