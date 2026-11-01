@@ -65,28 +65,49 @@ struct PuzzleProvider: AppIntentTimelineProvider {
 /// Complication artwork drawn with Canvas paths: an isometric three-face cube
 /// for 3x3, a top view of kite (corner) and edge pieces with coloured rims for
 /// Square-1. Colours are the app's sticker colours (CubeFace.stickerColor);
-/// when the system renders the widget tinted or vibrant, the same pieces are
-/// drawn as greys so they stay distinguishable by luminance alone.
+/// when the system renders the widget tinted or vibrant, the pieces are drawn
+/// as separated white cells at three opacities (line art) instead.
 struct PuzzleArt: View {
     let puzzle: Puzzle
     let fullColor: Bool
 
     var body: some View {
-        Canvas { context, size in
-            let side = min(size.width, size.height)
-            let lineWidth = max(0.6, side * 0.012)
-            switch puzzle {
-            case .cube3x3:
-                PuzzleArt.drawCube(&context,
-                                   center: CGPoint(x: size.width / 2, y: size.height / 2),
-                                   edge: side * 0.33, lineWidth: lineWidth, fullColor: fullColor)
-            case .square1:
-                PuzzleArt.drawSquare1(&context,
-                                      center: CGPoint(x: size.width / 2, y: size.height / 2),
-                                      radius: side * 0.27, lineWidth: lineWidth, fullColor: fullColor)
+        if fullColor {
+            Canvas { context, size in
+                PuzzleArt.drawColour(&context, puzzle: puzzle, size: size)
+            }
+        } else {
+            // Tinted / vibrant rendering flattens colour, so the art is drawn as
+            // line art: separated cells, three opacity levels, no black strokes.
+            // Only layer 0 is accentable; layers 1 and 2 stay plain white so the
+            // luminance differences between them survive the tint.
+            ZStack {
+                Canvas { context, size in
+                    PuzzleArt.drawLine(&context, puzzle: puzzle, size: size, layer: 0)
+                }
+                .widgetAccentable()
+                Canvas { context, size in
+                    PuzzleArt.drawLine(&context, puzzle: puzzle, size: size, layer: 1)
+                }
+                Canvas { context, size in
+                    PuzzleArt.drawLine(&context, puzzle: puzzle, size: size, layer: 2)
+                }
             }
         }
-        .widgetAccentable()
+    }
+
+    static func drawColour(_ context: inout GraphicsContext, puzzle: Puzzle, size: CGSize) {
+        let side = min(size.width, size.height)
+        let lineWidth = max(0.6, side * 0.012)
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        switch puzzle {
+        case .cube3x3:
+            drawCube(&context, center: center, edge: side * 0.48,
+                     lineWidth: lineWidth, fullColor: true)
+        case .square1:
+            drawSquare1(&context, center: center, radius: side * 0.29,
+                        lineWidth: lineWidth, fullColor: true)
+        }
     }
 
     // MARK: Colours
@@ -232,6 +253,136 @@ struct PuzzleArt: View {
             angle += span
         }
     }
+
+    // MARK: Line art (tinted / vibrant)
+
+    /// Shrinks a polygon towards its centroid, leaving a gap between neighbours.
+    static func inset(_ points: [CGPoint], _ factor: CGFloat) -> [CGPoint] {
+        var sumX: CGFloat = 0
+        var sumY: CGFloat = 0
+        for point in points {
+            sumX += point.x
+            sumY += point.y
+        }
+        let cx = sumX / CGFloat(points.count)
+        let cy = sumY / CGFloat(points.count)
+        return points.map {
+            CGPoint(x: cx + ($0.x - cx) * factor, y: cy + ($0.y - cy) * factor)
+        }
+    }
+
+    static func fillLine(_ context: inout GraphicsContext, _ points: [CGPoint],
+                         opacity: Double, factor: CGFloat) {
+        context.fill(polygon(inset(points, factor)),
+                     with: .color(Color.white.opacity(opacity)))
+    }
+
+    static func drawLine(_ context: inout GraphicsContext, puzzle: Puzzle,
+                         size: CGSize, layer: Int) {
+        let side = min(size.width, size.height)
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        switch puzzle {
+        case .cube3x3:
+            drawCubeLine(&context, center: center, edge: side * 0.48, layer: layer)
+        case .square1:
+            drawSquare1Line(&context, center: center, radius: side * 0.26, layer: layer)
+        }
+    }
+
+    /// Layer 0 = top face (opacity 1.0), 1 = left face (0.6), 2 = right face (0.32).
+    static func drawCubeLine(_ context: inout GraphicsContext, center: CGPoint,
+                             edge: CGFloat, layer: Int) {
+        let k = edge * 0.8660254
+        let h = edge * 0.5
+        let down = CGPoint(x: 0, y: edge)
+        let origin: CGPoint
+        let u: CGPoint
+        let v: CGPoint
+        let opacity: Double
+        switch layer {
+        case 0:
+            origin = CGPoint(x: center.x, y: center.y - edge)
+            u = CGPoint(x: k, y: h)
+            v = CGPoint(x: -k, y: h)
+            opacity = 1.0
+        case 1:
+            origin = CGPoint(x: center.x - k, y: center.y - h)
+            u = CGPoint(x: k, y: h)
+            v = down
+            opacity = 0.6
+        default:
+            origin = center
+            u = CGPoint(x: k, y: -h)
+            v = down
+            opacity = 0.32
+        }
+        for row in 0..<3 {
+            for col in 0..<3 {
+                let c0 = CGFloat(col) / 3
+                let c1 = CGFloat(col + 1) / 3
+                let r0 = CGFloat(row) / 3
+                let r1 = CGFloat(row + 1) / 3
+                let corners = [
+                    CGPoint(x: origin.x + u.x * c0 + v.x * r0, y: origin.y + u.y * c0 + v.y * r0),
+                    CGPoint(x: origin.x + u.x * c1 + v.x * r0, y: origin.y + u.y * c1 + v.y * r0),
+                    CGPoint(x: origin.x + u.x * c1 + v.x * r1, y: origin.y + u.y * c1 + v.y * r1),
+                    CGPoint(x: origin.x + u.x * c0 + v.x * r1, y: origin.y + u.y * c0 + v.y * r1),
+                ]
+                fillLine(&context, corners, opacity: opacity, factor: 0.78)
+            }
+        }
+    }
+
+    /// Layer 0 = top-face wedges (opacity 1.0), 1 = rim stickers (0.55 and 0.36).
+    /// Layer 2 is unused.
+    static func drawSquare1Line(_ context: inout GraphicsContext, center: CGPoint,
+                                radius: CGFloat, layer: Int) {
+        if layer > 1 { return }
+        let edgeRadius = radius / CGFloat(cos(15.0 * Double.pi / 180))
+        let tipRadius = radius * CGFloat(2.0.squareRoot())
+        let rimDepth = radius * 0.40
+        let gap = radius * 0.07
+
+        func point(_ degrees: Double, _ r: CGFloat) -> CGPoint {
+            let a = degrees * Double.pi / 180
+            return CGPoint(x: center.x + r * CGFloat(cos(a)),
+                           y: center.y + r * CGFloat(sin(a)))
+        }
+
+        var angle = 15.0
+        for piece in square1Pieces {
+            let span = piece.isCorner ? 60.0 : 30.0
+            let p0 = point(angle, edgeRadius)
+            let p1 = point(angle + span, edgeRadius)
+            let mid = angle + span / 2
+            if piece.isCorner {
+                if layer == 0 {
+                    fillLine(&context, [center, p0, point(mid, tipRadius), p1],
+                             opacity: 1.0, factor: 0.88)
+                } else {
+                    let g0 = point(angle, edgeRadius + gap)
+                    let g1 = point(angle + span, edgeRadius + gap)
+                    let gTip = point(mid, tipRadius + gap)
+                    let q0 = point(angle, edgeRadius + gap + rimDepth * 0.8)
+                    let q1 = point(angle + span, edgeRadius + gap + rimDepth * 0.8)
+                    let qTip = point(mid, tipRadius + gap + rimDepth)
+                    fillLine(&context, [g0, gTip, qTip, q0], opacity: 0.55, factor: 0.88)
+                    fillLine(&context, [gTip, g1, q1, qTip], opacity: 0.36, factor: 0.88)
+                }
+            } else {
+                if layer == 0 {
+                    fillLine(&context, [center, p0, p1], opacity: 1.0, factor: 0.88)
+                } else {
+                    let g0 = point(angle, edgeRadius + gap)
+                    let g1 = point(angle + span, edgeRadius + gap)
+                    let q0 = point(angle, edgeRadius + gap + rimDepth)
+                    let q1 = point(angle + span, edgeRadius + gap + rimDepth)
+                    fillLine(&context, [g0, g1, q1, q0], opacity: 0.55, factor: 0.88)
+                }
+            }
+            angle += span
+        }
+    }
 }
 
 // MARK: - View
@@ -285,8 +436,10 @@ struct ScrambleComplicationView: View {
                 Spacer(minLength: 0)
             }
         case .accessoryCorner:
+            // No fixed size: the art fills whatever the corner slot offers.
             PuzzleArt(puzzle: puzzle, fullColor: fullColor)
-                .frame(width: 34, height: 34)
+                .aspectRatio(1, contentMode: .fit)
+                .padding(1)
                 .widgetLabel { Text(puzzle.name) }
         case .accessoryInline:
             // Inline complications can only show text and SF Symbols.
