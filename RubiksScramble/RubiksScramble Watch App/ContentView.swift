@@ -31,8 +31,9 @@ struct ContentView: View {
     @State private var openPuzzle: Puzzle?
     @State private var showAbout = false
     @State private var showTimer = false
-    // Timer solve times for this app session; outlive the card being closed.
-    @State private var timerSolves: [TimeInterval] = []
+    // Timer solve times; outlive the card being closed and are restored from
+    // UserDefaults when the app is relaunched.
+    @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
     @Namespace private var cardSpace
 
     // Close affordance: invisible until the screen is touched, then a small
@@ -162,13 +163,18 @@ struct ContentView: View {
             }
         }
         // Complication tap: scramblegen://puzzle/<slug> opens that puzzle's
-        // page, same state change as tapping its wallet card.
+        // page, scramblegen://timer the Timer card; same state changes as
+        // tapping the wallet cards.
         .onOpenURL { url in
-            guard let target = Puzzle(deepLink: url) else { return }
-            puzzle = target
+            guard let target = ComplicationTarget(deepLink: url) else { return }
             showAbout = false
-            showTimer = false
-            withAnimation(Self.spring) { openPuzzle = target }
+            if let target = target.puzzle {
+                puzzle = target
+                showTimer = false
+                withAnimation(Self.spring) { openPuzzle = target }
+            } else {
+                withAnimation(Self.spring) { openPuzzle = nil; showTimer = true }
+            }
         }
         .onAppear {
             for option in Puzzle.allCases where moves[option] == nil {
@@ -262,13 +268,11 @@ private struct CardStack: View {
                     Spacer()
                 }
                 Spacer(minLength: 4)
-                // Stopwatch icon with a sample time.
-                HStack(spacing: 4) {
-                    Image(systemName: "stopwatch")
-                        .font(.system(size: 34, weight: .light))
-                    Text("8.42")
-                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                // Speed cube timer art.
+                Canvas { context, size in
+                    PuzzleArtDrawing.drawTimerColour(&context, size: size)
                 }
+                .frame(width: 64, height: 34)
             }
             .foregroundStyle(.white)
             .padding(12)

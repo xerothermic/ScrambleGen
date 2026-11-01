@@ -3,17 +3,19 @@ import SwiftUI
 import WidgetKit
 
 // Watch-face complication: shows the chosen puzzle and, when tapped, opens
-// the app on that puzzle (scramblegen://puzzle/<slug>, handled by
-// ContentView.onOpenURL). Puzzle, its colours and the URL format are shared
-// with the app via ScrambleGenerator.swift and PuzzleStyle.swift.
+// the app on that puzzle (scramblegen://puzzle/<slug>) or on the Timer card
+// (scramblegen://timer), handled by ContentView.onOpenURL. Puzzle, its colours
+// and the URL format are shared with the app via ScrambleGenerator.swift and
+// PuzzleStyle.swift.
 
 // MARK: - Intent
 
-extension Puzzle: AppEnum {
+extension ComplicationTarget: AppEnum {
     static var typeDisplayRepresentation: TypeDisplayRepresentation { "Puzzle" }
-    static var caseDisplayRepresentations: [Puzzle: DisplayRepresentation] {
+    static var caseDisplayRepresentations: [ComplicationTarget: DisplayRepresentation] {
         [.cube3x3: DisplayRepresentation(title: "3×3"),
-         .square1: DisplayRepresentation(title: "Square-1")]
+         .square1: DisplayRepresentation(title: "Square-1"),
+         .timer: DisplayRepresentation(title: "Timer")]
     }
 }
 
@@ -24,17 +26,21 @@ struct SelectPuzzleIntent: WidgetConfigurationIntent {
     }
 
     @Parameter(title: "Puzzle", default: .cube3x3)
-    var puzzle: Puzzle
+    var puzzle: ComplicationTarget
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("\(\.$puzzle)")
+    }
 
     init() {}
-    init(puzzle: Puzzle) { self.puzzle = puzzle }
+    init(puzzle: ComplicationTarget) { self.puzzle = puzzle }
 }
 
 // MARK: - Timeline
 
 struct PuzzleEntry: TimelineEntry {
     let date: Date
-    let puzzle: Puzzle
+    let puzzle: ComplicationTarget
 }
 
 struct PuzzleProvider: AppIntentTimelineProvider {
@@ -53,9 +59,16 @@ struct PuzzleProvider: AppIntentTimelineProvider {
 
     // watchOS lists these in the face editor's complication gallery.
     func recommendations() -> [AppIntentRecommendation<SelectPuzzleIntent>] {
-        Puzzle.allCases.map {
-            AppIntentRecommendation(intent: SelectPuzzleIntent(puzzle: $0),
-                                    description: Text($0.name))
+        // Explicit per-case strings so each row's label is unambiguous.
+        ComplicationTarget.allCases.map { target in
+            let label: String
+            switch target {
+            case .cube3x3: label = "3×3 Cube"
+            case .square1: label = "Square-1"
+            case .timer: label = "Timer"
+            }
+            return AppIntentRecommendation(intent: SelectPuzzleIntent(puzzle: target),
+                                           description: Text(verbatim: label))
         }
     }
 }
@@ -64,17 +77,21 @@ struct PuzzleProvider: AppIntentTimelineProvider {
 
 /// Complication artwork drawn with Canvas paths: an isometric three-face cube
 /// for 3x3, a top view of kite (corner) and edge pieces with coloured rims for
-/// Square-1. Colours are the app's sticker colours (CubeFace.stickerColor);
+/// Square-1, a speed cube timer for Timer. Colours are the app's sticker colours (CubeFace.stickerColor);
 /// when the system renders the widget tinted or vibrant, the pieces are drawn
 /// as separated white cells at three opacities (line art) instead.
 struct PuzzleArt: View {
-    let puzzle: Puzzle
+    let puzzle: ComplicationTarget
     let fullColor: Bool
 
     var body: some View {
         if fullColor {
             Canvas { context, size in
-                PuzzleArtDrawing.drawColour(&context, puzzle: puzzle, size: size)
+                if let puzzle = puzzle.puzzle {
+                    PuzzleArtDrawing.drawColour(&context, puzzle: puzzle, size: size)
+                } else {
+                    PuzzleArtDrawing.drawTimerColour(&context, size: size)
+                }
             }
         } else {
             // Tinted / vibrant rendering flattens colour, so the art is drawn as
@@ -83,14 +100,26 @@ struct PuzzleArt: View {
             // luminance differences between them survive the tint.
             ZStack {
                 Canvas { context, size in
-                    PuzzleArtDrawing.drawLine(&context, puzzle: puzzle, size: size, layer: 0)
+                    if let puzzle = puzzle.puzzle {
+                        PuzzleArtDrawing.drawLine(&context, puzzle: puzzle, size: size, layer: 0)
+                    } else {
+                        PuzzleArtDrawing.drawTimerLine(&context, size: size, layer: 0)
+                    }
                 }
                 .widgetAccentable()
                 Canvas { context, size in
-                    PuzzleArtDrawing.drawLine(&context, puzzle: puzzle, size: size, layer: 1)
+                    if let puzzle = puzzle.puzzle {
+                        PuzzleArtDrawing.drawLine(&context, puzzle: puzzle, size: size, layer: 1)
+                    } else {
+                        PuzzleArtDrawing.drawTimerLine(&context, size: size, layer: 1)
+                    }
                 }
                 Canvas { context, size in
-                    PuzzleArtDrawing.drawLine(&context, puzzle: puzzle, size: size, layer: 2)
+                    if let puzzle = puzzle.puzzle {
+                        PuzzleArtDrawing.drawLine(&context, puzzle: puzzle, size: size, layer: 2)
+                    } else {
+                        PuzzleArtDrawing.drawTimerLine(&context, size: size, layer: 2)
+                    }
                 }
             }
         }
@@ -105,13 +134,14 @@ struct ScrambleComplicationView: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.widgetRenderingMode) private var renderingMode
 
-    private var puzzle: Puzzle { entry.puzzle }
+    private var puzzle: ComplicationTarget { entry.puzzle }
     private var fullColor: Bool { renderingMode == .fullColor }
 
     private var title: String {
         switch puzzle {
         case .cube3x3: return "3×3 Cube"
         case .square1: return "Square-1"
+        case .timer: return "Timer"
         }
     }
 

@@ -54,6 +54,99 @@ enum PuzzleArtDrawing {
                        style: StrokeStyle(lineWidth: lineWidth, lineJoin: .round))
     }
 
+    // MARK: Timer (speed cube timer)
+
+    /// Generic Stackmat/Speed-Stacks-style timer: dark bow-tie body, raised
+    /// centre panel with an LCD, a round yellow hand pad on each wing. Drawn in
+    /// a 1 x 0.5 box (unit coordinates, y 0.2...0.7) fitted to the canvas width.
+    private struct TimerGeo {
+        let ox: CGFloat, oy: CGFloat, w: CGFloat
+        init(_ size: CGSize) {
+            w = min(size.width, size.height * 2.1) * 0.98
+            ox = (size.width - w) / 2
+            oy = size.height / 2 - 0.45 * w
+        }
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * w, y: oy + y * w) }
+        func rect(_ x0: CGFloat, _ y0: CGFloat, _ x1: CGFloat, _ y1: CGFloat) -> CGRect {
+            CGRect(x: ox + x0 * w, y: oy + y0 * w, width: (x1 - x0) * w, height: (y1 - y0) * w)
+        }
+        func circle(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: ox + (x - r) * w, y: oy + (y - r) * w,
+                                   width: 2 * r * w, height: 2 * r * w))
+        }
+        var body: [CGPoint] {
+            [p(0.02, 0.30), p(0.36, 0.22), p(0.64, 0.22), p(0.98, 0.30), p(0.98, 0.56),
+             p(0.90, 0.68), p(0.50, 0.58), p(0.10, 0.68), p(0.02, 0.56)]
+        }
+        var panel: CGRect { rect(0.34, 0.20, 0.66, 0.54) }
+        var lcd: CGRect { rect(0.38, 0.25, 0.62, 0.40) }
+        var padR: CGFloat { 0.10 }
+        var pads: [CGPoint] { [CGPoint(x: 0.17, y: 0.43), CGPoint(x: 0.83, y: 0.43)] }
+    }
+
+    /// Seven-segment "0.00" inside the LCD rect as bars (large enough to read
+    /// as digits even at complication size).
+    private static func lcdDigits(_ g: TimerGeo) -> [CGRect] {
+        let r = g.lcd
+        let digitW = r.width * 0.2, gap = r.width * 0.07
+        let h = r.height * 0.7, t = max(0.8, r.height * 0.14)
+        let total = digitW * 3 + gap * 2 + r.width * 0.08
+        var x = r.minX + (r.width - total) / 2
+        let y = r.minY + (r.height - h) / 2
+        var out: [CGRect] = []
+        for i in 0..<3 {
+            // Digit "0": top, bottom, left, right.
+            out.append(CGRect(x: x, y: y, width: digitW, height: t))
+            out.append(CGRect(x: x, y: y + h - t, width: digitW, height: t))
+            out.append(CGRect(x: x, y: y, width: t, height: h))
+            out.append(CGRect(x: x + digitW - t, y: y, width: t, height: h))
+            x += digitW + gap
+            if i == 0 {
+                out.append(CGRect(x: x - gap / 2 - t / 2 + r.width * 0.04, y: y + h - t, width: t, height: t))
+                x += r.width * 0.08
+            }
+        }
+        return out
+    }
+
+    /// Full colour: dark body, silver panel, green-grey LCD with dark digits,
+    /// yellow hand pads.
+    static func drawTimerColour(_ context: inout GraphicsContext, size: CGSize) {
+        let g = TimerGeo(size)
+        let lineWidth = max(0.6, g.w * 0.012)
+        paint(&context, g.body, color: Color(hex: 0x2A2A2F), lineWidth: lineWidth)
+        context.fill(Path(roundedRect: g.panel, cornerRadius: g.w * 0.04), with: .color(Color(hex: 0xB9BDC4)))
+        context.fill(Path(roundedRect: g.lcd, cornerRadius: g.w * 0.015), with: .color(Color(hex: 0xA8B58C)))
+        for d in lcdDigits(g) { context.fill(Path(d), with: .color(Color(hex: 0x1B1F14))) }
+        for c in g.pads {
+            let pad = g.circle(c.x, c.y, g.padR)
+            context.fill(pad, with: .color(Color(hex: 0xF4C20D)))
+            context.stroke(pad, with: .color(.black), style: StrokeStyle(lineWidth: lineWidth * 0.8))
+        }
+        let power = g.circle(0.56, 0.47, 0.025)
+        context.fill(power, with: .color(Color(hex: 0xCE2029)))
+    }
+
+    /// Line art. Layer 0 = body outline and LCD digits (opacity 1.0),
+    /// 1 = hand pads (0.6), 2 = centre panel and LCD window (0.32).
+    static func drawTimerLine(_ context: inout GraphicsContext, size: CGSize, layer: Int) {
+        let g = TimerGeo(size)
+        switch layer {
+        case 0:
+            context.stroke(polygon(g.body), with: .color(.white),
+                           style: StrokeStyle(lineWidth: max(1, g.w * 0.035), lineJoin: .round))
+            for d in lcdDigits(g) { context.fill(Path(d), with: .color(.white)) }
+        case 1:
+            for c in g.pads {
+                context.fill(g.circle(c.x, c.y, g.padR), with: .color(Color.white.opacity(0.6)))
+            }
+        default:
+            context.fill(Path(roundedRect: g.panel, cornerRadius: g.w * 0.04),
+                         with: .color(Color.white.opacity(0.32)))
+        }
+    }
+
+
     // MARK: 3x3
 
     static let cubeTop: [CubeFace] =

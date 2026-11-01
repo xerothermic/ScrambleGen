@@ -33,6 +33,18 @@ enum TimerCard {
 
     /// Solve times kept for the session (in memory only).
     static let maxSolves = 20
+    static let solvesKey = "timerSolves"
+    static let totalKey = "timerSolveTotal"
+
+    /// Solves saved by an earlier launch (oldest first).
+    static func loadSolves() -> [TimeInterval] {
+        let saved = UserDefaults.standard.array(forKey: solvesKey) as? [Double] ?? []
+        return Array(saved.suffix(maxSolves))
+    }
+
+    static func saveSolves(_ solves: [TimeInterval]) {
+        UserDefaults.standard.set(solves, forKey: solvesKey)
+    }
 
     /// "8.42", "1:02.42"; without centiseconds (dimmed always-on display):
     /// "8", "1:02".
@@ -223,6 +235,9 @@ struct TimerScreen: View {
     @Binding var solves: [TimeInterval]
 
     @AppStorage("timerCountdown") private var countdown = TimerCard.defaultCountdown
+    /// Solves ever recorded since the last Reset, so row numbers keep counting
+    /// up after the list is capped.
+    @AppStorage(TimerCard.totalKey) private var total = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
@@ -306,6 +321,9 @@ struct TimerScreen: View {
         if solves.count > TimerCard.maxSolves {
             solves.removeFirst(solves.count - TimerCard.maxSolves)
         }
+        total = max(total, solves.count - 1) + 1
+        TimerCard.saveSolves(solves)
+        timerLog.info("solve saved, count \(solves.count, privacy: .public), total \(total, privacy: .public)")
         phase = .done
         WKInterfaceDevice.current().play(.stop)
     }
@@ -330,7 +348,7 @@ struct TimerScreen: View {
                 .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text("\(seconds)")
-                    .font(.system(size: 60, weight: .bold, design: .rounded))
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
                     .monospacedDigit()
                 Text("s")
                     .font(.system(size: 20, weight: .semibold))
@@ -341,12 +359,24 @@ struct TimerScreen: View {
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            Text("Tap to start")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.accentColor))
+            // Big Start button: >= 44 pt tall and wide (the whole screen also
+            // starts it); the digits are 46 pt so it still fits a 40 mm screen.
+            Button { beginCountdown() } label: {
+                Text("Start")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 110, minHeight: 44)
+                    .background(Capsule().fill(Color.accentColor))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+            // Wrist Flick drops the app back to the clock mid-solve.
+            Text("Tip: for solving, turn off Settings > Gestures > Wrist Flick.")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.8)
+                .lineLimit(2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
@@ -374,12 +404,21 @@ struct TimerScreen: View {
             Text("Inspection")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            TimelineView(.animation) { context in
-                let remaining = max(0, countdownEnd.timeIntervalSince(context.date))
-                Text("\(Int(remaining.rounded(.up)))")
-                    .font(.system(size: 80, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(remaining <= 3 ? Color.orange : Color.white)
+            if isLuminanceReduced {
+                TimelineView(.periodic(from: countdownEnd, by: 1)) { context in
+                    Text("\(Int(max(0, countdownEnd.timeIntervalSince(context.date)).rounded(.up)))")
+                        .font(.system(size: 80, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.gray)
+                }
+            } else {
+                TimelineView(.animation) { context in
+                    let remaining = max(0, countdownEnd.timeIntervalSince(context.date))
+                    Text("\(Int(remaining.rounded(.up)))")
+                        .font(.system(size: 80, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(remaining <= 3 ? Color.orange : Color.white)
+                }
             }
             Button("Cancel") { reset() }
                 .font(.system(size: 14, weight: .medium))
@@ -389,13 +428,26 @@ struct TimerScreen: View {
 
     private var runningView: some View {
         VStack(spacing: 6) {
-            TimelineView(.animation) { context in
-                Text(TimerCard.format(context.date.timeIntervalSince(runStart),
-                                      centis: !isLuminanceReduced))
-                    .font(.system(size: 42, weight: .semibold, design: .monospaced))
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                    .foregroundStyle(isLuminanceReduced ? Color.gray : Color.white)
+            // Always On: the UI only keeps updating through a TimelineView, and
+            // dimmed it is limited to about 1 Hz, so drop the sub-second digits
+            // and tick on whole seconds since the start.
+            if isLuminanceReduced {
+                TimelineView(.periodic(from: runStart, by: 1)) { context in
+                    Text(TimerCard.format(context.date.timeIntervalSince(runStart),
+                                          centis: false))
+                        .font(.system(size: 42, weight: .semibold, design: .monospaced))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .foregroundStyle(Color.gray)
+                }
+            } else {
+                TimelineView(.animation) { context in
+                    Text(TimerCard.format(context.date.timeIntervalSince(runStart)))
+                        .font(.system(size: 42, weight: .semibold, design: .monospaced))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .foregroundStyle(Color.white)
+                }
             }
             if !isLuminanceReduced {
                 Text("Slap to stop · or tap")
@@ -435,7 +487,7 @@ struct TimerScreen: View {
                 VStack(spacing: 2) {
                     ForEach(Array(solves.suffix(5).reversed().enumerated()), id: \.offset) { item in
                         HStack {
-                            Text("\(solves.count - item.offset)")
+                            Text("\(max(total, solves.count) - item.offset)")
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text(TimerCard.format(item.element))
@@ -447,6 +499,8 @@ struct TimerScreen: View {
 
                 Button("Reset") {
                     solves = []
+                    total = 0
+                    TimerCard.saveSolves([])
                     reset()
                 }
                 .font(.system(size: 14, weight: .medium))

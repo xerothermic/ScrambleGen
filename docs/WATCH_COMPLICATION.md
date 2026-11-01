@@ -12,13 +12,18 @@ the app. Customizable which scramble."
   three-face cube for 3x3 (rectangular title "3×3 Cube") and a top view of kite
   (corner) and edge pieces with coloured rims for Square-1. Colours come from
   `CubeFace.stickerColor`; in tinted/vibrant rendering the same pieces are drawn
-  in greys (luminance differences) and the art is `widgetAccentable`. Inline can
+  in greys (luminance differences) and the art is `widgetAccentable`. The **Timer** option (and the app's Timer card) draws a generic speed cube timer in the
+  style of a Stackmat/Speed Stacks pad, no branding (`drawTimerColour`: dark bow-tie body,
+  silver centre panel, LCD showing 0.00, two round yellow hand pads; tinted: body outline
+  and digits accentable, pads 0.6, centre panel 0.32;
+  inline uses `stopwatch.fill`). Inline can
   only show text and SF Symbols, so it keeps `cube.fill` /
   `square.split.diagonal` plus the name. Card colours still come from
   `Puzzle.cardColor`.
 - Long-press the face, tap Edit, tap the complication, and pick **Puzzle**: 3x3
   or Square-1. The gallery also lists both as ready-made suggestions.
-- Tapping it opens the app straight on that puzzle's page.
+- Tapping it opens the app straight on that puzzle's page, or on the Timer card
+  for the Timer option (`scramblegen://timer`).
 
 ## How it works
 
@@ -29,18 +34,23 @@ the app. Customizable which scramble."
 | Shared puzzle styling and deep-link format | `RubiksScramble/RubiksScramble Watch App/PuzzleStyle.swift` |
 | `.onOpenURL` handler | `ContentView.swift` (`ContentView.body`) |
 
-- **Options.** The widget target compiles the app's own `ScrambleGenerator.swift`
+- **Options.** The intent parameter is `ComplicationTarget` (in `PuzzleStyle.swift`):
+  the `Puzzle` cases plus `.timer`, which is not a `Puzzle`. Its `AppEnum`
+  conformance and display titles live in `ScrambleWidget.swift`; raw values match
+  `Puzzle`'s, so existing complications keep their choice. The widget target compiles the app's own `ScrambleGenerator.swift`
   (the `Puzzle` enum), `CubeState.swift`, `Square1Scrambler.swift` and
   `PuzzleStyle.swift`. `extension Puzzle: AppEnum` (in `ScrambleWidget.swift`) maps
   every case to a `DisplayRepresentation`, and `SelectPuzzleIntent`
   (`WidgetConfigurationIntent`) has `@Parameter var puzzle: Puzzle`. The options
-  list is therefore `Puzzle.allCases`: **adding a Puzzle case needs one line in
-  `caseDisplayRepresentations`** (the compiler will complain if it is missing)
-  and a `PuzzleStyle.swift` entry.
+  list is `ComplicationTarget.allCases`: **adding a Puzzle case needs a
+  `ComplicationTarget` case, one line in `caseDisplayRepresentations`** (the
+  compiler complains if missing) and a `PuzzleStyle.swift` entry.
 - **Deep link.** The view sets `.widgetURL(puzzle.deepLink)`, i.e.
-  `scramblegen://puzzle/3x3` or `scramblegen://puzzle/square1`.
-  `ContentView` handles it with `.onOpenURL`: parse with `Puzzle(deepLink:)`,
-  set the `puzzle` AppStorage value, clear About, and set `openPuzzle` inside
+  `scramblegen://puzzle/3x3`, `scramblegen://puzzle/square1` or
+  `scramblegen://timer`.
+  `ContentView` handles it with `.onOpenURL`: parse with `ComplicationTarget(deepLink:)`,
+  set the `puzzle` AppStorage value, clear About, and set `openPuzzle` (or
+  `showTimer` for the Timer link) inside
   the usual spring animation, the same state change as tapping a wallet card.
   A custom scheme does not need registering for `widgetURL` (watchOS has no
   `CFBundleURLTypes`).
@@ -125,3 +135,22 @@ year and when the Apple Distribution certificate is replaced, like the others
 (edit the profile, tick the new certificate, download, redo steps 10 and 11).
 After the secret exists, run TestFlight (`gh workflow run testflight.yml --ref
 bob/watch-complication`) to confirm the signed archive and upload.
+
+## Timer card notes (same change)
+
+- Setup screen shows a dimmed tip: turn off Settings > Gestures > Wrist Flick for
+  solving (Wrist Flick drops the app back to the clock mid-solve). Hidden while
+  the timer runs.
+- Always On: the countdown and run digits are driven by `TimelineView`; when
+  `isLuminanceReduced` they use a 1 Hz `.periodic` schedule (whole seconds, no
+  sub-second digits), otherwise `.animation`. Motion detection and the extended
+  runtime session are unchanged.
+
+## Editor labels (Timer row)
+
+The gallery row text comes from `recommendations()`. Each entry now sets an explicit
+`Text(verbatim:)` label per `ComplicationTarget` ("3×3 Cube", "Square-1", "Timer"), and
+the intent declares `parameterSummary` (`\(\.$puzzle)`). A screenshot had shown
+"Square-1" beside the Timer row; the old code derived it from `name`, which was already
+"Timer", so a stale cached gallery from an earlier build is also possible (remove and
+re-add the complication). Untested on a watch.
