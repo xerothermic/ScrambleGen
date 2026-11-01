@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreMotion
 import WatchKit
+import os
 
 /// Constants for the Timer card (Wallet-stack card + the timer screen).
 enum TimerCard {
@@ -113,35 +114,100 @@ final class StopDetector {
     }
 }
 
-/// Keeps the app running with the wrist down while the timer counts down and
-/// runs. Needs WKBackgroundModes in the watch app's Info.plist (BuildInfo.plist).
+/// Logging for the Timer card (Console: subsystem com.pcintaiwan.scramblegen.watch,
+/// category timer).
+let timerLog = Logger(subsystem: "com.pcintaiwan.scramblegen.watch", category: "timer")
+
+/// Single owner of the extended runtime session. Keeps the app running with the
+/// wrist down while the timer counts down and runs. Needs WKBackgroundModes in
+/// the watch app's Info.plist (BuildInfo.plist). Exactly one fresh session per
+/// run; the old one is invalidated and its delegate cleared first; callbacks
+/// from any session other than the current one are ignored. Never dismisses or
+/// exits anything.
 final class RuntimeKeeper: NSObject, WKExtendedRuntimeSessionDelegate {
     private var session: WKExtendedRuntimeSession?
+    /// True while a run wants a session (between start() and stop()).
+    private var wanted = false
+    private var retries = 0
+    private static let maxRetries = 2
 
     var isRunning: Bool { session?.state == .running }
+    /// A session exists that is starting or running.
+    var isActiveOrStarting: Bool {
+        guard let s = session else { return false }
+        return s.state == .running || s.state == .scheduled
+    }
 
+    /// Call on the main thread, with the app active.
     func start() {
-        if let s = session, s.state == .running || s.state == .scheduled { return }
+        wanted = true
+        retries = 0
+        launch()
+    }
+
+    private func launch() {
+        discardSession()
         let s = WKExtendedRuntimeSession()
         s.delegate = self
-        s.start()
         session = s
+        s.start()
+        timerLog.info("runtime session start requested")
     }
 
+    /// Call on the main thread.
     func stop() {
-        if let s = session, s.state != .invalid { s.invalidate() }
-        session = nil
+        wanted = false
+        retries = 0
+        if session != nil { timerLog.info("runtime session stop") }
+        discardSession()
     }
 
-    func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {}
+    private func discardSession() {
+        guard let s = session else { return }
+        session = nil
+        s.delegate = nil
+        if s.state == .running || s.state == .scheduled { s.invalidate() }
+    }
 
-    func extendedRuntimeSessionWillExpire(_ extendedRuntimeSession: WKExtendedRuntimeSession) {}
+    func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let current = self.session === extendedRuntimeSession
+            timerLog.info("runtime session did start (current: \(current, privacy: .public))")
+        }
+    }
+
+    func extendedRuntimeSessionWillExpire(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let current = self.session === extendedRuntimeSession
+            timerLog.info("runtime session will expire (current: \(current, privacy: .public))")
+        }
+    }
 
     func extendedRuntimeSession(_ extendedRuntimeSession: WKExtendedRuntimeSession,
                                 didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason,
                                 error: Error?) {
+        let code = reason.rawValue
+        let desc = error.map { "\($0)" } ?? "none"
         DispatchQueue.main.async { [weak self] in
-            if self?.session === extendedRuntimeSession { self?.session = nil }
+            guard let self = self else { return }
+            guard self.session === extendedRuntimeSession else {
+                timerLog.info("ignored stale session invalidation, reason \(code, privacy: .public)")
+                return
+            }
+            timerLog.error("current runtime session invalidated, reason \(code, privacy: .public), error \(desc, privacy: .public)")
+            self.session = nil
+            // Lost the session while a run still wants one: try a fresh one
+            // (only possible while the app is in the foreground).
+            if self.wanted, self.retries < Self.maxRetries {
+                self.retries += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self = self, self.wanted, self.session == nil else { return }
+                    timerLog.info("retrying runtime session, attempt \(self.retries, privacy: .public)")
+                    self.launch()
+                }
+            }
         }
     }
 }
@@ -183,6 +249,10 @@ struct TimerScreen: View {
     // MARK: Flow
 
     private func beginCountdown() {
+        guard phase == .idle || phase == .done else { return }
+        countdownTask?.cancel()
+        countdownTask = nil
+        detector.stop()
         let total = seconds
         runtime.start()
         guard total > 0 else { beginRun(); return }
@@ -204,6 +274,7 @@ struct TimerScreen: View {
 
     private func beginRun() {
         countdownTask = nil
+        guard phase == .countdown || phase == .idle || phase == .done else { return }
         let startUptime = ProcessInfo.processInfo.systemUptime
         runStart = Date()
         runStartUptime = startUptime
@@ -242,6 +313,7 @@ struct TimerScreen: View {
     /// Back to the idle screen; stops the task, the motion manager and the
     /// extended runtime session.
     private func reset() {
+        timerLog.info("reset")
         countdownTask?.cancel()
         countdownTask = nil
         detector.stop()
@@ -395,13 +467,17 @@ struct TimerScreen: View {
             }
             .modifier(CloseAwareTitle(title: "Timer"))
         }
+        .onChange(of: phase) { old, new in
+            timerLog.info("phase \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public)")
+        }
         // Leaving the card (close, swipe, deep link) stops everything.
         .onDisappear { reset() }
         // Backgrounding aborts a countdown/run, unless the extended runtime
         // session is keeping the app alive (wrist down).
         .onChange(of: scenePhase) { _, new in
+            timerLog.info("scenePhase \(String(describing: new), privacy: .public), phase \(String(describing: phase), privacy: .public), runtime running \(runtime.isRunning, privacy: .public)")
             if new != .active, phase == .countdown || phase == .running,
-               !runtime.isRunning {
+               !runtime.isRunning, !runtime.isActiveOrStarting {
                 reset()
             }
         }
