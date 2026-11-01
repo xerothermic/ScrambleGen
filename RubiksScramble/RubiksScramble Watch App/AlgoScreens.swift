@@ -28,44 +28,68 @@ struct AlgoScreen: View {
 
     private var cases: [AlgoCase] { filter.cases(progress: store.progress) }
 
+    private enum Route: Hashable {
+        case drill, practice, learn, quiz, cases, set, progress
+    }
+    @State private var route: Route?
+
+    /// Rows are plain Buttons that set `route` (state-driven navigation), not
+    /// NavigationLinks: a Button's tap is known to work under the app's
+    /// full-screen touch gestures, with a full-row hit area.
+    private func menuButton(_ r: Route, _ title: String, _ sub: String,
+                            _ symbol: String) -> some View {
+        Button { route = r; play(.click) } label: {
+            menuRow(title, sub, symbol)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+    }
+
+    private func bigButton(_ r: Route, _ title: String, _ sub: String,
+                           _ symbol: String) -> some View {
+        Button { route = r; play(.click) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: symbol).font(.system(size: 20, weight: .bold))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title).font(.system(size: 19, weight: .bold))
+                    Text(sub).font(.caption2).opacity(0.85)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(RoundedRectangle(cornerRadius: 14).fill(AlgoCardInfo.color))
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
+    }
+
+    @ViewBuilder
+    private func destination(_ r: Route) -> some View {
+        switch r {
+        case .drill: AlgoDrillView(cases: cases, practice: false)
+        case .practice: AlgoDrillView(cases: cases, practice: true)
+        case .learn: AlgoLearnView(cases: cases)
+        case .quiz: AlgoQuizView(cases: cases)
+        case .cases: AlgoListView(cases: cases)
+        case .set: AlgoFilterView(filter: $filter)
+        case .progress: AlgoProgressView()
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                NavigationLink {
-                    AlgoDrillView(cases: cases, practice: false)
-                } label: {
-                    menuRow("Drill", "\(store.dueCount(in: cases)) due", "timer")
-                }
-                NavigationLink {
-                    AlgoDrillView(cases: cases, practice: true)
-                } label: {
-                    menuRow("Practice", "on your cube", "hand.tap")
-                }
-                NavigationLink {
-                    AlgoLearnView(cases: cases)
-                } label: {
-                    menuRow("Learn", "\(cases.count) cases", "book")
-                }
-                NavigationLink {
-                    AlgoQuizView(cases: cases)
-                } label: {
-                    menuRow("Quiz", "picture or name", "questionmark.circle")
-                }
-                NavigationLink {
-                    AlgoListView(cases: cases)
-                } label: {
-                    menuRow("Cases", "list", "list.bullet")
-                }
-                NavigationLink {
-                    AlgoFilterView(filter: $filter)
-                } label: {
-                    menuRow("Set", filter.label, "line.3.horizontal.decrease.circle")
-                }
-                NavigationLink {
-                    AlgoProgressView()
-                } label: {
-                    menuRow("Progress", "best times", "chart.bar")
-                }
+                bigButton(.drill, "Drill", "\(store.dueCount(in: cases)) due", "timer")
+                bigButton(.practice, "Practice", "on your cube", "hand.tap")
+                menuButton(.learn, "Learn", "\(cases.count) cases", "book")
+                menuButton(.quiz, "Quiz", "picture or name", "questionmark.circle")
+                menuButton(.cases, "Cases", "list", "list.bullet")
+                menuButton(.set, "Set", filter.label, "line.3.horizontal.decrease.circle")
+                menuButton(.progress, "Progress", "best times", "chart.bar")
                 Toggle(isOn: $inverseBonus) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Inverse bonus").font(.system(size: 15, weight: .medium))
@@ -74,6 +98,7 @@ struct AlgoScreen: View {
                     }
                 }
             }
+            .navigationDestination(item: $route) { destination($0) }
             .modifier(CloseAwareTitle(title: "Algorithms"))
         }
         .environmentObject(store)
@@ -133,6 +158,7 @@ private struct AlgoCasePage: View {
     let algoCase: AlgoCase
     var scrolls = false
     @State private var bigAlg = false
+    @State private var showInverse = false
 
     private var longAlg: Bool { AlgoText.moveCount(algoCase.alg) > 12 }
 
@@ -143,13 +169,14 @@ private struct AlgoCasePage: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else if let inv = AlgoLibrary.inverse(of: algoCase) {
-                NavigationLink {
-                    AlgoCaseDetailView(algoCase: inv)
-                } label: {
+                Button { showInverse = true } label: {
                     Text("Inverse: \(inv.name)")
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                }
+                .navigationDestination(isPresented: $showInverse) {
+                    AlgoCaseDetailView(algoCase: inv)
                 }
                 .buttonStyle(.bordered)
             }
@@ -253,13 +280,12 @@ private struct AlgoLearnView: View {
 private struct AlgoListView: View {
     let cases: [AlgoCase]
     @EnvironmentObject private var store: AlgoStore
+    @State private var openID: String?
 
     var body: some View {
         List {
             ForEach(cases) { c in
-                NavigationLink {
-                    AlgoCaseDetailView(algoCase: c)
-                } label: {
+                Button { openID = c.id } label: {
                     HStack(spacing: 6) {
                         AlgoCaseView(algoCase: c, size: 34)
                         VStack(alignment: .leading, spacing: 1) {
@@ -277,7 +303,13 @@ private struct AlgoListView: View {
                             .fill(boxColor(store.entry(c.id).box))
                             .frame(width: 8, height: 8)
                     }
+                    .contentShape(Rectangle())
                 }
+            }
+        }
+        .navigationDestination(item: $openID) { id in
+            if let c = AlgoLibrary.all.first(where: { $0.id == id }) {
+                AlgoCaseDetailView(algoCase: c)
             }
         }
         .navigationTitle("Cases")
@@ -391,51 +423,59 @@ private struct AlgoDrillView: View {
     // MARK: Screens
 
     private var readyView: some View {
-        ScrollView {
-            if let c = current {
-                VStack(spacing: 5) {
-                    if bonus {
-                        Text("Now its inverse")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(AlgoCardInfo.color)
-                    }
-                    AlgoCaseView(algoCase: c, variant: variant, size: 96)
-                    HStack(spacing: 3) {
-                        ForEach(1...5, id: \.self) { i in
-                            Circle()
-                                .fill(i <= store.entry(c.id).box
-                                      ? boxColor(store.entry(c.id).box)
-                                      : Color.gray.opacity(0.3))
-                                .frame(width: 6, height: 6)
+        VStack(spacing: 4) {
+            ScrollView {
+                if let c = current {
+                    VStack(spacing: 5) {
+                        if bonus {
+                            Text("Now its inverse")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(AlgoCardInfo.color)
+                        }
+                        AlgoCaseView(algoCase: c, variant: variant, size: 84)
+                        HStack(spacing: 3) {
+                            ForEach(1...5, id: \.self) { i in
+                                Circle()
+                                    .fill(i <= store.entry(c.id).box
+                                          ? boxColor(store.entry(c.id).box)
+                                          : Color.gray.opacity(0.3))
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                        Text(AlgoText.lines(variant?.setup ?? c.setup, perLine: 4))
+                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .multilineTextAlignment(.leading)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity)
+                            .padding(6)
+                            .background(RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.black.opacity(0.35)))
+                        if done > 0 {
+                            Text("\(done) done")
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
-                    Text(AlgoText.lines(variant?.setup ?? c.setup, perLine: 4))
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        .multilineTextAlignment(.leading)
-                        .minimumScaleFactor(0.7)
-                        .frame(maxWidth: .infinity)
-                        .padding(6)
-                        .background(RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.black.opacity(0.35)))
-                    Button { start() } label: {
-                        Text("Start")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Capsule().fill(Color.accentColor))
-                    }
-                    .buttonStyle(.plain)
-                    if done > 0 {
-                        Text("\(done) done")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
+                    .padding(.horizontal, 4)
+                } else {
+                    Text("No cases in this set.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 20)
                 }
+            }
+            // Pinned below the scroll area so it is always on screen, never
+            // scrolled off the bottom of a small watch.
+            if current != nil {
+                Button { start() } label: {
+                    Text("Start")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Capsule().fill(Color.accentColor))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 4)
-            } else {
-                Text("No cases in this set.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 20)
             }
         }
     }
