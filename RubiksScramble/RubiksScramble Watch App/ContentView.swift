@@ -60,6 +60,38 @@ struct ContentView: View {
         }
     }
 
+    /// Close button laid out inside the safe area. The inset is derived from the
+    /// screen width (corner radius scales with the case, ~0.25 x width), so the
+    /// circle clears the rounded corner on 41/45/49 mm without model checks.
+    /// Circle d = 36: centre >= R(1 - 1/sqrt2) + d/2 from each edge.
+    private var closeButton: some View {
+        GeometryReader { geo in
+            let insets = geo.safeAreaInsets
+            let screenW = geo.size.width + insets.leading + insets.trailing
+            let cornerInset = screenW * 0.25 * 0.293 + 6   // origin offset from screen edge
+            let padL = max(6, cornerInset - insets.leading)
+            let padT = max(6, cornerInset - insets.top)
+            Button { close() } label: {
+                ZStack {
+                    Circle().fill(.ultraThinMaterial)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 18, weight: .bold))
+                }
+                .frame(width: 36, height: 36)
+                .padding(.leading, padL)
+                .padding(.top, padT)
+                .opacity(showClose ? 1 : 0)
+                // Large hit area (>= 64 pt) anchored at the corner.
+                .frame(width: 36 + padL + 24, height: 36 + padT + 24,
+                       alignment: .topLeading)
+                .frame(minWidth: 64, minHeight: 64, alignment: .topLeading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
+        }
+    }
+
     var body: some View {
         Group {
             if openPuzzle != nil || showAbout {
@@ -89,24 +121,7 @@ struct ContentView: View {
                                    abs(g.translation.height) < 40 { close() }
                             }
                     )
-                    .overlay(alignment: .topLeading) {
-                        Button { close() } label: {
-                            ZStack {
-                                Circle().fill(.ultraThinMaterial)
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 20, weight: .bold))
-                            }
-                            .frame(width: 42, height: 42)
-                            // Inset so the circle clears the rounded screen corner.
-                            .padding(8)
-                            .opacity(showClose ? 1 : 0)
-                            .frame(width: 70, height: 70, alignment: .topLeading)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Close")
-                        .ignoresSafeArea()
-                    }
+                    .overlay(alignment: .topLeading) { closeButton }
                     .transition(.opacity)
             } else {
                 CardStack(lastUsed: puzzle, space: cardSpace, onPick: { option in
@@ -134,8 +149,8 @@ private struct CardStack: View {
     let onPick: (Puzzle) -> Void
     let onAbout: () -> Void
 
-    private let cardHeight: CGFloat = 120
-    private let peek: CGFloat = 64
+    private let cardHeight: CGFloat = 92
+    private let peek: CGFloat = 50
 
     private func color(_ option: Puzzle) -> Color { option.cardColor }
 
@@ -226,11 +241,10 @@ private struct CardStack: View {
         .buttonStyle(.plain)
         .scrollTransition(axis: .vertical) { content, phase in
             content
-                .rotation3DEffect(.degrees(phase.value * -22),
+                .rotation3DEffect(.degrees(phase.value * -12),
                                   axis: (x: 1, y: 0, z: 0),
                                   anchor: .center, perspective: 0.6)
-                .scaleEffect(1 - abs(phase.value) * 0.06)
-                .opacity(1 - abs(phase.value) * 0.25)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
         }
         .accessibilityLabel("About, version \(AboutCard.versionString)")
     }
@@ -281,18 +295,18 @@ private struct CardStack: View {
                     .buttonStyle(.plain)
                     .scrollTransition(axis: .vertical) { content, phase in
                         content
-                            .rotation3DEffect(.degrees(phase.value * -22),
+                            .rotation3DEffect(.degrees(phase.value * -12),
                                               axis: (x: 1, y: 0, z: 0),
                                               anchor: .center, perspective: 0.6)
-                            .scaleEffect(1 - abs(phase.value) * 0.06)
-                            .opacity(1 - abs(phase.value) * 0.25)
+                            .scaleEffect(1 - abs(phase.value) * 0.04)
                     }
                     .accessibilityLabel("\(option.name) scramble")
                 }
-                aboutCard
+                aboutCard.zIndex(10)
             }
             .padding(.horizontal, 4)
-            .padding(.vertical, 6)
+            .padding(.top, 6)
+            .padding(.bottom, 14)
         }
     }
 }
