@@ -339,16 +339,15 @@ private struct CardStack: View {
 
     var body: some View {
         // Crown / touch scrolls the stack. Cards overlap via negative spacing,
-        // later cards on top (About first, then Timer, Square-1, 3x3 last); scrollTransition tilts each card in perspective
+        // earlier cards on top via zIndex (3x3 front, then Square-1, Timer, About); scrollTransition tilts each card in perspective
         // (like Wallet) as it nears the top or bottom edge.
         ScrollView {
             VStack(spacing: peek - cardHeight) {
-                // About is the back card (top of the screen), then Timer; the
-                // 3x3 card is the front card and sits fully visible at the
-                // bottom. Front to back: 3x3, Square-1, Timer, About.
-                aboutCard
-                timerCard
-                ForEach(Array(Puzzle.allCases.reversed()), id: \.self) { option in
+                // On screen, top to bottom: 3x3, Square-1, Timer, About. The
+                // 3x3 card is the front card (highest zIndex) and fully
+                // visible; each later card sits behind the previous one and
+                // peeks out below it. About is the back card.
+                ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
                     Button {
                         onPick(option)
                     } label: {
@@ -394,7 +393,10 @@ private struct CardStack: View {
                             .scaleEffect(1 - abs(phase.value) * 0.04)
                     }
                     .accessibilityLabel("\(option.name) scramble")
+                    .zIndex(Double(Puzzle.allCases.count - index + 1))
                 }
+                timerCard.zIndex(1)
+                aboutCard.zIndex(0)
             }
             .padding(.horizontal, 4)
             .padding(.top, 6)
