@@ -187,59 +187,21 @@ private struct CardStack: View {
     let onAbout: () -> Void
     let onTimer: () -> Void
 
-    private let cardHeight: CGFloat = 92
-    private let peek: CGFloat = 50
+    private let cardHeight: CGFloat = 84
+    private let frontCardHeight: CGFloat = 104
+    private let aboutCardHeight: CGFloat = 64
+    private let gap: CGFloat = 8
 
     private func color(_ option: Puzzle) -> Color { option.cardColor }
 
-    /// Tiny solved-state map of the puzzle, reusing the real map drawing code.
+    /// Card picture: the approved "A" artwork, same drawing code as the
+    /// complications (PuzzleArtDrawing).
     @ViewBuilder
-    private func preview(_ option: Puzzle) -> some View {
-        switch option {
-        case .cube3x3:
-            let cube = CubeState()
-            let cell: CGFloat = 3.5
-            let face: CGFloat = cell * 3 + 1
-            VStack(spacing: 1) {
-                ForEach(0..<3, id: \.self) { row in
-                    HStack(spacing: 1) {
-                        ForEach(0..<4, id: \.self) { col in
-                            if let f = Self.net[row][col] {
-                                miniFace(cube, f, cell: cell)
-                            } else {
-                                Color.clear.frame(width: face, height: face)
-                            }
-                        }
-                    }
-                }
-            }
-        case .square1:
-            let state = Square1State()
-            Canvas { context, size in
-                Square1Drawing.draw(state, in: &context, size: size)
-            }
-            .frame(width: 26, height: 50)
+    private func preview(_ option: Puzzle, size: CGFloat) -> some View {
+        Canvas { context, canvas in
+            PuzzleArtDrawing.drawColour(&context, puzzle: option, size: canvas)
         }
-    }
-
-    private static let net: [[CubeFace?]] = [
-        [nil, .up, nil, nil],
-        [.left, .front, .right, .back],
-        [nil, .down, nil, nil],
-    ]
-
-    private func miniFace(_ cube: CubeState, _ face: CubeFace, cell: CGFloat) -> some View {
-        VStack(spacing: 0.5) {
-            ForEach(0..<3, id: \.self) { r in
-                HStack(spacing: 0.5) {
-                    ForEach(0..<3, id: \.self) { c in
-                        Rectangle()
-                            .fill(cube.color(face: face, row: r, col: c))
-                            .frame(width: cell, height: cell)
-                    }
-                }
-            }
-        }
+        .frame(width: size, height: size)
     }
 
     private var aboutCard: some View {
@@ -255,12 +217,13 @@ private struct CardStack: View {
                 }
                 Spacer(minLength: 4)
                 Image(systemName: "info.circle")
-                    .font(.system(size: 34, weight: .light))
+                    .font(.system(size: 28, weight: .light))
             }
             .foregroundStyle(.white)
+            .opacity(0.9)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: cardHeight)
+            .frame(height: aboutCardHeight)
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(LinearGradient(
@@ -302,7 +265,7 @@ private struct CardStack: View {
                 // Stopwatch icon with a sample time.
                 HStack(spacing: 4) {
                     Image(systemName: "stopwatch")
-                        .font(.system(size: 26, weight: .light))
+                        .font(.system(size: 34, weight: .light))
                     Text("8.42")
                         .font(.system(size: 15, weight: .semibold, design: .monospaced))
                 }
@@ -338,15 +301,14 @@ private struct CardStack: View {
     }
 
     var body: some View {
-        // Crown / touch scrolls the stack. Cards overlap via negative spacing,
-        // earlier cards on top via zIndex (3x3 front, then Square-1, Timer, About); scrollTransition tilts each card in perspective
-        // (like Wallet) as it nears the top or bottom edge.
+        // Crown / touch scrolls the stack. Cards are laid out vertically with
+        // real spacing (no overlap, every title and picture stays visible);
+        // scrollTransition tilts each card in perspective (like Wallet) as it
+        // nears the top or bottom edge.
         ScrollView {
-            VStack(spacing: peek - cardHeight) {
-                // On screen, top to bottom: 3x3, Square-1, Timer, About. The
-                // 3x3 card is the front card (highest zIndex) and fully
-                // visible; each later card sits behind the previous one and
-                // peeks out below it. About is the back card.
+            VStack(spacing: gap) {
+                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, About
+                // (last, smallest and quietest).
                 ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
                     Button {
                         onPick(option)
@@ -361,12 +323,12 @@ private struct CardStack: View {
                                 Spacer()
                             }
                             Spacer(minLength: 4)
-                            preview(option)
+                            preview(option, size: index == 0 ? 72 : 56)
                         }
                         .foregroundStyle(.white)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(height: cardHeight)
+                        .frame(height: index == 0 ? frontCardHeight : cardHeight)
                         .background(
                             RoundedRectangle(cornerRadius: 18)
                                 .fill(LinearGradient(
@@ -393,10 +355,9 @@ private struct CardStack: View {
                             .scaleEffect(1 - abs(phase.value) * 0.04)
                     }
                     .accessibilityLabel("\(option.name) scramble")
-                    .zIndex(Double(Puzzle.allCases.count - index + 1))
                 }
-                timerCard.zIndex(1)
-                aboutCard.zIndex(0)
+                timerCard
+                aboutCard
             }
             .padding(.horizontal, 4)
             .padding(.top, 6)
