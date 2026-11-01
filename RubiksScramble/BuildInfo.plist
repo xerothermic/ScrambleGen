@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged into the generated Info.plist. CI passes BUILD_TIME_UTC and
+	     BUILD_SHA on the xcodebuild command line; local builds show "unknown". -->
+	<key>BuildTimeUTC</key>
+	<string>$(BUILD_TIME_UTC)</string>
+	<key>BuildSHA</key>
+	<string>$(BUILD_SHA)</string>
+</dict>
+</plist>
