@@ -133,3 +133,13 @@ year and when the Apple Distribution certificate is replaced, like the others
 (edit the profile, tick the new certificate, download, redo steps 10 and 11).
 After the secret exists, run TestFlight (`gh workflow run testflight.yml --ref
 bob/watch-complication`) to confirm the signed archive and upload.
+
+## Timer card notes (same change)
+
+- Setup screen shows a dimmed tip: turn off Settings > Gestures > Wrist Flick for
+  solving (Wrist Flick drops the app back to the clock mid-solve). Hidden while
+  the timer runs.
+- Always On: the countdown and run digits are driven by `TimelineView`; when
+  `isLuminanceReduced` they use a 1 Hz `.periodic` schedule (whole seconds, no
+  sub-second digits), otherwise `.animation`. Motion detection and the extended
+  runtime session are unchanged.
