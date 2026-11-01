@@ -332,6 +332,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				BUILD_SHA = unknown;
+				BUILD_TIME_UTC = unknown;
+				INFOPLIST_FILE = BuildInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
@@ -357,6 +360,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				BUILD_SHA = unknown;
+				BUILD_TIME_UTC = unknown;
+				INFOPLIST_FILE = BuildInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;

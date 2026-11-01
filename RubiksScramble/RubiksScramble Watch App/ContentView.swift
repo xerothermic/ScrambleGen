@@ -340,6 +340,28 @@ enum AboutCard {
         let b = info?["CFBundleVersion"] as? String ?? "?"
         return "\(v) (\(b))"
     }
+
+    /// "Built 2026-10-31 19:20 PDT" in the watch's local time, from the UTC
+    /// stamp CI injects (Info.plist BuildTimeUTC). nil for local builds.
+    static var builtString: String? {
+        guard let raw = Bundle.main.infoDictionary?["BuildTimeUTC"] as? String else { return nil }
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = TimeZone(identifier: "UTC")
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
+        guard let date = parser.date(from: raw) else { return nil }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        out.dateFormat = "yyyy-MM-dd HH:mm zzz"
+        return "Built " + out.string(from: date)
+    }
+
+    /// Short git SHA from CI, nil for local builds.
+    static var shaString: String? {
+        guard let sha = Bundle.main.infoDictionary?["BuildSHA"] as? String,
+              !sha.isEmpty, sha != "unknown" else { return nil }
+        return sha
+    }
 }
 
 private struct AboutView: View {
@@ -353,6 +375,17 @@ private struct AboutView: View {
                 Text("Version \(AboutCard.versionString)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                if let built = AboutCard.builtString {
+                    Text(built)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                if let sha = AboutCard.shaString {
+                    Text(sha)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .opacity(0.8)
+                }
                 Text("3×3 and Square-1 scrambles with puzzle maps.")
                     .font(.caption2)
                     .multilineTextAlignment(.center)

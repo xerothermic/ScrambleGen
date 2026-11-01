@@ -488,6 +488,8 @@ jobs:
             -archivePath "$ARCHIVE_PATH" \
             MARKETING_VERSION="$MARKETING_VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            BUILD_TIME_UTC="$(date -u +%Y-%m-%dT%H:%MZ)" \
+            BUILD_SHA="${GITHUB_SHA::7}" \
             "${OVERRIDES[@]}"
 
           echo "Signing authority of archived apps:"
