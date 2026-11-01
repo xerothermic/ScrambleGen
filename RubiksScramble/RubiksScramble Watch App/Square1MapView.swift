@@ -57,7 +57,7 @@ struct Square1MapView: View {
             }
             .padding(.horizontal, 6)
             .padding(.bottom, 6)
-            .navigationTitle("Square-1")
+            .modifier(CloseAwareTitle(title: "Square-1"))
         }
     }
 }

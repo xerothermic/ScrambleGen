@@ -1,5 +1,23 @@
 import SwiftUI
 
+private struct CloseShownKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    /// True while the close button is visible (page titles hide meanwhile).
+    var closeShown: Bool {
+        get { self[CloseShownKey.self] }
+        set { self[CloseShownKey.self] = newValue }
+    }
+}
+
+/// Navigation title that blanks while the close button occupies its spot.
+struct CloseAwareTitle: ViewModifier {
+    let title: String
+    @Environment(\.closeShown) private var closeShown
+    func body(content: Content) -> some View {
+        content.navigationTitle(closeShown ? "" : title)
+    }
+}
+
 struct ContentView: View {
     @AppStorage("puzzle") private var puzzle: Puzzle = .cube3x3
     @State private var lengths = Dictionary(
@@ -15,7 +33,7 @@ struct ContentView: View {
     @Namespace private var cardSpace
 
     // Close affordance: invisible until the screen is touched, then a small
-    // xmark that fades out again ~2.5 s after the last touch.
+    // xmark that fades out again ~2 s after the last touch.
     @State private var showClose = false
     @State private var touching = false
     @State private var hideTask: Task<Void, Never>?
@@ -31,7 +49,7 @@ struct ContentView: View {
     private func scheduleHide() {
         hideTask?.cancel()
         hideTask = Task {
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.5)) { showClose = false }
         }
@@ -60,17 +78,15 @@ struct ContentView: View {
         }
     }
 
-    /// Close button laid out inside the safe area. The inset is derived from the
-    /// screen width (corner radius scales with the case, ~0.25 x width), so the
-    /// circle clears the rounded corner on 41/45/49 mm without model checks.
-    /// Circle d = 36: centre >= R(1 - 1/sqrt2) + d/2 from each edge.
+    /// Close button, centred at (34, 33) pt from the screen's top-left: it sits
+    /// over the nav-title spot (the title fades out while the button shows).
+    /// The GeometryReader ignores the safe area, so the origin is the screen
+    /// corner, not below the title bar. Circle d = 36 spans x 16...52,
+    /// y 15...51, which is inside the rounded corner (radius ~ 0.25 x width on
+    /// the Ultra 3, 41-49 mm cases have similar proportions).
     private var closeButton: some View {
-        GeometryReader { geo in
-            let insets = geo.safeAreaInsets
-            let screenW = geo.size.width + insets.leading + insets.trailing
-            let cornerInset = screenW * 0.25 * 0.293 + 6   // origin offset from screen edge
-            let padL = max(6, cornerInset - insets.leading)
-            let padT = max(6, cornerInset - insets.top)
+        GeometryReader { _ in
+            let padL: CGFloat = 16, padT: CGFloat = 15
             Button { close() } label: {
                 ZStack {
                     Circle().fill(.ultraThinMaterial)
@@ -90,6 +106,7 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
         }
+        .ignoresSafeArea()
     }
 
     var body: some View {
@@ -122,6 +139,7 @@ struct ContentView: View {
                             }
                     )
                     .overlay(alignment: .topLeading) { closeButton }
+                    .environment(\.closeShown, showClose)
                     .transition(.opacity)
             } else {
                 CardStack(lastUsed: puzzle, space: cardSpace, onPick: { option in
@@ -540,7 +558,7 @@ private struct ScrambleScreen: View {
                 }
                 .padding(.horizontal, 4)
             }
-            .navigationTitle(puzzle.name)
+            .modifier(CloseAwareTitle(title: puzzle.name))
         }
         // Swiping to the other puzzle shouldn't leave the crown bound here.
         .onDisappear { isSelected = false }
