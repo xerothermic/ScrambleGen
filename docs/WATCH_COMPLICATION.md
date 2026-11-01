@@ -12,8 +12,10 @@ the app. Customizable which scramble."
   three-face cube for 3x3 (rectangular title "3×3 Cube") and a top view of kite
   (corner) and edge pieces with coloured rims for Square-1. Colours come from
   `CubeFace.stickerColor`; in tinted/vibrant rendering the same pieces are drawn
-  in greys (luminance differences) and the art is `widgetAccentable`. The **Timer** option draws a stopwatch (blue face, light case, red-tipped hand;
-  tinted: case ring/crown accentable, ticks and hand 0.6, elapsed wedge 0.32;
+  in greys (luminance differences) and the art is `widgetAccentable`. The **Timer** option (and the app's Timer card) draws a generic speed cube timer in the
+  style of a Stackmat/Speed Stacks pad, no branding (`drawTimerColour`: dark bow-tie body,
+  silver centre panel, LCD showing 0.00, two round yellow hand pads; tinted: body outline
+  and digits accentable, pads 0.6, centre panel 0.32;
   inline uses `stopwatch.fill`). Inline can
   only show text and SF Symbols, so it keeps `cube.fill` /
   `square.split.diagonal` plus the name. Card colours still come from
@@ -143,3 +145,12 @@ bob/watch-complication`) to confirm the signed archive and upload.
   `isLuminanceReduced` they use a 1 Hz `.periodic` schedule (whole seconds, no
   sub-second digits), otherwise `.animation`. Motion detection and the extended
   runtime session are unchanged.
+
+## Editor labels (Timer row)
+
+The gallery row text comes from `recommendations()`. Each entry now sets an explicit
+`Text(verbatim:)` label per `ComplicationTarget` ("3×3 Cube", "Square-1", "Timer"), and
+the intent declares `parameterSummary` (`\(\.$puzzle)`). A screenshot had shown
+"Square-1" beside the Timer row; the old code derived it from `name`, which was already
+"Timer", so a stale cached gallery from an earlier build is also possible (remove and
+re-add the complication). Untested on a watch.

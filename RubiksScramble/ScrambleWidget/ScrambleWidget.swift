@@ -28,6 +28,10 @@ struct SelectPuzzleIntent: WidgetConfigurationIntent {
     @Parameter(title: "Puzzle", default: .cube3x3)
     var puzzle: ComplicationTarget
 
+    static var parameterSummary: some ParameterSummary {
+        Summary("\(\.$puzzle)")
+    }
+
     init() {}
     init(puzzle: ComplicationTarget) { self.puzzle = puzzle }
 }
@@ -55,9 +59,16 @@ struct PuzzleProvider: AppIntentTimelineProvider {
 
     // watchOS lists these in the face editor's complication gallery.
     func recommendations() -> [AppIntentRecommendation<SelectPuzzleIntent>] {
-        ComplicationTarget.allCases.map {
-            AppIntentRecommendation(intent: SelectPuzzleIntent(puzzle: $0),
-                                    description: Text($0.name))
+        // Explicit per-case strings so each row's label is unambiguous.
+        ComplicationTarget.allCases.map { target in
+            let label: String
+            switch target {
+            case .cube3x3: label = "3×3 Cube"
+            case .square1: label = "Square-1"
+            case .timer: label = "Timer"
+            }
+            return AppIntentRecommendation(intent: SelectPuzzleIntent(puzzle: target),
+                                           description: Text(verbatim: label))
         }
     }
 }
@@ -66,7 +77,7 @@ struct PuzzleProvider: AppIntentTimelineProvider {
 
 /// Complication artwork drawn with Canvas paths: an isometric three-face cube
 /// for 3x3, a top view of kite (corner) and edge pieces with coloured rims for
-/// Square-1, a stopwatch for Timer. Colours are the app's sticker colours (CubeFace.stickerColor);
+/// Square-1, a speed cube timer for Timer. Colours are the app's sticker colours (CubeFace.stickerColor);
 /// when the system renders the widget tinted or vibrant, the pieces are drawn
 /// as separated white cells at three opacities (line art) instead.
 struct PuzzleArt: View {

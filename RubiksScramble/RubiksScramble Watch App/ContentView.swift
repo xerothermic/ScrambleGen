@@ -267,13 +267,11 @@ private struct CardStack: View {
                     Spacer()
                 }
                 Spacer(minLength: 4)
-                // Stopwatch icon with a sample time.
-                HStack(spacing: 4) {
-                    Image(systemName: "stopwatch")
-                        .font(.system(size: 34, weight: .light))
-                    Text("8.42")
-                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                // Speed cube timer art.
+                Canvas { context, size in
+                    PuzzleArtDrawing.drawTimerColour(&context, size: size)
                 }
+                .frame(width: 64, height: 34)
             }
             .foregroundStyle(.white)
             .padding(12)
