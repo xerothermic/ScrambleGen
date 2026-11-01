@@ -7,8 +7,16 @@ name: Compile check
 # It also checks the extension carries the SAME CFBundleShortVersionString and
 # CFBundleVersion as the watch app, which App Store Connect requires.
 
+# gh cannot dispatch a workflow that is not on the default branch yet (HTTP
+# 404), so until this file reaches main it ALSO runs on a push to the
+# complication branch that changes this file (touch the "run:" line below to
+# re-run). Delete the push trigger once the file is on main.
+# run: 1
 on:
   workflow_dispatch:
+  push:
+    branches: [bob/watch-complication]
+    paths: ['.github/workflows/compile-check.yml']
 
 permissions:
   contents: read
