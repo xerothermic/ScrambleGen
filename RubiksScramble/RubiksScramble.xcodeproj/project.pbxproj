@@ -17,6 +17,13 @@
 		AA0000000000000000000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000016 /* Assets.xcassets */; };
 		AA0000000000000000000021 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* PrivacyInfo.xcprivacy */; };
 		BB000000000000000000000A /* RubiksScramble Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000006 /* RubiksScramble Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA0000000000000000000023 /* PuzzleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000022 /* PuzzleStyle.swift */; };
+		CC0000000000000000000011 /* ScrambleWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000001 /* ScrambleWidget.swift */; };
+		CC0000000000000000000012 /* ScrambleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000014 /* ScrambleGenerator.swift */; };
+		CC0000000000000000000013 /* CubeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000018 /* CubeState.swift */; };
+		CC0000000000000000000014 /* Square1Scrambler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001C /* Square1Scrambler.swift */; };
+		CC0000000000000000000015 /* PuzzleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000022 /* PuzzleStyle.swift */; };
+		CC0000000000000000000016 /* ScrambleWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000003 /* ScrambleWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,6 +33,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = AA0000000000000000000005;
 			remoteInfo = "RubiksScramble Watch App";
+		};
+		CC000000000000000000000E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CC0000000000000000000005;
+			remoteInfo = ScrambleWidgetExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -39,6 +53,17 @@
 				BB000000000000000000000A /* RubiksScramble Watch App.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC0000000000000000000010 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CC0000000000000000000016 /* ScrambleWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -55,10 +80,21 @@
 		AA0000000000000000000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA0000000000000000000020 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB0000000000000000000006 /* CubeScramble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CubeScramble.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000022 /* PuzzleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuzzleStyle.swift; sourceTree = "<group>"; };
+		CC0000000000000000000001 /* ScrambleWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrambleWidget.swift; sourceTree = "<group>"; };
+		CC0000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CC0000000000000000000003 /* ScrambleWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ScrambleWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		AA0000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC0000000000000000000008 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -72,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000000000000000000004 /* RubiksScramble Watch App */,
+				CC0000000000000000000004 /* ScrambleWidget */,
 				AA0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -81,6 +118,7 @@
 			children = (
 				BB0000000000000000000006 /* CubeScramble.app */,
 				AA0000000000000000000006 /* RubiksScramble Watch App.app */,
+				CC0000000000000000000003 /* ScrambleWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -90,6 +128,7 @@
 			children = (
 				AA0000000000000000000010 /* RubiksScrambleApp.swift */,
 				AA0000000000000000000012 /* ContentView.swift */,
+				AA0000000000000000000022 /* PuzzleStyle.swift */,
 				AA0000000000000000000014 /* ScrambleGenerator.swift */,
 				AA0000000000000000000018 /* CubeState.swift */,
 				AA000000000000000000001A /* CubeMapView.swift */,
@@ -99,6 +138,15 @@
 				AA0000000000000000000020 /* PrivacyInfo.xcprivacy */,
 			);
 			path = "RubiksScramble Watch App";
+			sourceTree = "<group>";
+		};
+		CC0000000000000000000004 /* ScrambleWidget */ = {
+			isa = PBXGroup;
+			children = (
+				CC0000000000000000000001 /* ScrambleWidget.swift */,
+				CC0000000000000000000002 /* Info.plist */,
+			);
+			path = ScrambleWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -111,10 +159,12 @@
 				AA0000000000000000000007 /* Sources */,
 				AA0000000000000000000008 /* Frameworks */,
 				AA0000000000000000000009 /* Resources */,
+				CC0000000000000000000010 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CC000000000000000000000F /* PBXTargetDependency */,
 			);
 			name = "RubiksScramble Watch App";
 			productName = "RubiksScramble Watch App";
@@ -138,6 +188,22 @@
 			productReference = BB0000000000000000000006 /* CubeScramble.app */;
 			productType = "com.apple.product-type.application.watchapp2-container";
 		};
+		CC0000000000000000000005 /* ScrambleWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CC000000000000000000000B /* Build configuration list for PBXNativeTarget "ScrambleWidgetExtension" */;
+			buildPhases = (
+				CC0000000000000000000007 /* Sources */,
+				CC0000000000000000000008 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ScrambleWidgetExtension;
+			productName = ScrambleWidgetExtension;
+			productReference = CC0000000000000000000003 /* ScrambleWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -152,6 +218,9 @@
 						CreatedOnToolsVersion = 15.0;
 					};
 					BB0000000000000000000005 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					CC0000000000000000000005 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -171,6 +240,7 @@
 			targets = (
 				BB0000000000000000000005 /* CubeScramble */,
 				AA0000000000000000000005 /* RubiksScramble Watch App */,
+				CC0000000000000000000005 /* ScrambleWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -206,6 +276,19 @@
 				AA000000000000000000001B /* CubeMapView.swift in Sources */,
 				AA000000000000000000001D /* Square1Scrambler.swift in Sources */,
 				AA000000000000000000001F /* Square1MapView.swift in Sources */,
+				AA0000000000000000000023 /* PuzzleStyle.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC0000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC0000000000000000000011 /* ScrambleWidget.swift in Sources */,
+				CC0000000000000000000012 /* ScrambleGenerator.swift in Sources */,
+				CC0000000000000000000013 /* CubeState.swift in Sources */,
+				CC0000000000000000000014 /* Square1Scrambler.swift in Sources */,
+				CC0000000000000000000015 /* PuzzleStyle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -216,6 +299,11 @@
 			isa = PBXTargetDependency;
 			target = AA0000000000000000000005 /* RubiksScramble Watch App */;
 			targetProxy = BB000000000000000000000E /* PBXContainerItemProxy */;
+		};
+		CC000000000000000000000F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CC0000000000000000000005 /* ScrambleWidgetExtension */;
+			targetProxy = CC000000000000000000000E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -332,11 +420,14 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				BUILD_SHA = unknown;
+				BUILD_TIME_UTC = unknown;
+				INFOPLIST_FILE = BuildInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -357,11 +448,14 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				BUILD_SHA = unknown;
+				BUILD_TIME_UTC = unknown;
+				INFOPLIST_FILE = BuildInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -382,7 +476,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -399,11 +493,61 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CC000000000000000000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ScrambleWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble Complication";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch.widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		CC000000000000000000000D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ScrambleWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble Complication";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch.widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Release;
 		};
@@ -433,6 +577,15 @@
 			buildConfigurations = (
 				BB000000000000000000000C /* Debug */,
 				BB000000000000000000000D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CC000000000000000000000B /* Build configuration list for PBXNativeTarget "ScrambleWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC000000000000000000000C /* Debug */,
+				CC000000000000000000000D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

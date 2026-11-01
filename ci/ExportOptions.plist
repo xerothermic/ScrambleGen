@@ -11,7 +11,9 @@
 
   Signing is always manual: the workflow fills in signingCertificate and
   provisioningProfiles from SIGNING_CERTIFICATE / PROVISIONING_PROFILES in
-  ci/release.config.
+  ci/release.config. That list covers all three signed bundles: the
+  container (com.pcintaiwan.scramblegen), the watch app (.watch) and the
+  complication extension (.watch.widget), so nothing is hard-coded here.
 -->
 <plist version="1.0">
 <dict>

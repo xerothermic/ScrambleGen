@@ -26,7 +26,7 @@ struct CubeMapView: View {
                 .padding(6)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle("Cube")
+            .modifier(CloseAwareTitle(title: "Cube"))
         }
     }
 

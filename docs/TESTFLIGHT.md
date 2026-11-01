@@ -128,6 +128,10 @@ are ignored and can be deleted.
 
 #### The App Store profiles (`APPLE_PROVISIONING_PROFILES`)
 
+> The watch-face complication extension's profile is a separate secret,
+> `PROVISIONING_PROFILE_WATCH_WIDGET_BASE64` (see
+> [WATCH_COMPLICATION.md](WATCH_COMPLICATION.md)); both workflows require it.
+
 One profile per bundle in the archive — an embedded watch app needs its
 own. On [Certificates, Identifiers & Profiles → Profiles](https://developer.apple.com/account/resources/profiles/list)
 → **+** → *Distribution* → **App Store Connect** → pick the App ID → tick the
@@ -198,9 +202,10 @@ never uploads the same commit twice.
 
 App Store Connect rejects a build whose `(version, build)` pair it has already
 seen, so the build number must strictly increase within a marketing version.
-The default `BUILD_NUMBER_OFFSET + GITHUB_RUN_NUMBER` guarantees that as long
-as nobody uploads by hand from a Mac. If someone does and overtakes CI, raise
-`BUILD_NUMBER_OFFSET` past the manual number.
+The default is a sequential counter in `ci/build-number`: both workflows run
+`ci/reserve-build-number.sh`, which adds 1, commits it back with `[skip ci]`
+and uses it. Reset the file to `0` when the marketing version changes. Pass
+`build_number` to override (e.g. a hotfix for an older version).
 
 `manageAppVersionAndBuildNumber` is `false` in `ci/ExportOptions.plist`
 precisely so Xcode doesn't quietly substitute its own numbering.
