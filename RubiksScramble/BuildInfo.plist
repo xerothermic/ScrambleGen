@@ -8,5 +8,12 @@
 	<string>$(BUILD_TIME_UTC)</string>
 	<key>BuildSHA</key>
 	<string>$(BUILD_SHA)</string>
+	<!-- Lets the Timer card keep running with the wrist down
+	     (WKExtendedRuntimeSession). Info.plist only: no entitlement, capability
+	     or provisioning-profile change. -->
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>self-care</string>
+	</array>
 </dict>
 </plist>
