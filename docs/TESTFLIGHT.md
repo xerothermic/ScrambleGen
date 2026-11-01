@@ -128,6 +128,10 @@ are ignored and can be deleted.
 
 #### The App Store profiles (`APPLE_PROVISIONING_PROFILES`)
 
+> The watch-face complication extension's profile is a separate secret,
+> `PROVISIONING_PROFILE_WATCH_WIDGET_BASE64` (see
+> [WATCH_COMPLICATION.md](WATCH_COMPLICATION.md)); both workflows require it.
+
 One profile per bundle in the archive — an embedded watch app needs its
 own. On [Certificates, Identifiers & Profiles → Profiles](https://developer.apple.com/account/resources/profiles/list)
 → **+** → *Distribution* → **App Store Connect** → pick the App ID → tick the
