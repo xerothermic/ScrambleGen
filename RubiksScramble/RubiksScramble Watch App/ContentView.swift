@@ -31,8 +31,9 @@ struct ContentView: View {
     @State private var openPuzzle: Puzzle?
     @State private var showAbout = false
     @State private var showTimer = false
-    // Timer solve times for this app session; outlive the card being closed.
-    @State private var timerSolves: [TimeInterval] = []
+    // Timer solve times; outlive the card being closed and are restored from
+    // UserDefaults when the app is relaunched.
+    @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
     @Namespace private var cardSpace
 
     // Close affordance: invisible until the screen is touched, then a small

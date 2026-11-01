@@ -33,6 +33,18 @@ enum TimerCard {
 
     /// Solve times kept for the session (in memory only).
     static let maxSolves = 20
+    static let solvesKey = "timerSolves"
+    static let totalKey = "timerSolveTotal"
+
+    /// Solves saved by an earlier launch (oldest first).
+    static func loadSolves() -> [TimeInterval] {
+        let saved = UserDefaults.standard.array(forKey: solvesKey) as? [Double] ?? []
+        return Array(saved.suffix(maxSolves))
+    }
+
+    static func saveSolves(_ solves: [TimeInterval]) {
+        UserDefaults.standard.set(solves, forKey: solvesKey)
+    }
 
     /// "8.42", "1:02.42"; without centiseconds (dimmed always-on display):
     /// "8", "1:02".
@@ -223,6 +235,9 @@ struct TimerScreen: View {
     @Binding var solves: [TimeInterval]
 
     @AppStorage("timerCountdown") private var countdown = TimerCard.defaultCountdown
+    /// Solves ever recorded since the last Reset, so row numbers keep counting
+    /// up after the list is capped.
+    @AppStorage(TimerCard.totalKey) private var total = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
@@ -306,6 +321,9 @@ struct TimerScreen: View {
         if solves.count > TimerCard.maxSolves {
             solves.removeFirst(solves.count - TimerCard.maxSolves)
         }
+        total = max(total, solves.count - 1) + 1
+        TimerCard.saveSolves(solves)
+        timerLog.info("solve saved, count \(solves.count, privacy: .public), total \(total, privacy: .public)")
         phase = .done
         WKInterfaceDevice.current().play(.stop)
     }
@@ -469,7 +487,7 @@ struct TimerScreen: View {
                 VStack(spacing: 2) {
                     ForEach(Array(solves.suffix(5).reversed().enumerated()), id: \.offset) { item in
                         HStack {
-                            Text("\(solves.count - item.offset)")
+                            Text("\(max(total, solves.count) - item.offset)")
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text(TimerCard.format(item.element))
@@ -481,6 +499,8 @@ struct TimerScreen: View {
 
                 Button("Reset") {
                     solves = []
+                    total = 0
+                    TimerCard.saveSolves([])
                     reset()
                 }
                 .font(.system(size: 14, weight: .medium))
