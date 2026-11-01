@@ -30,7 +30,8 @@ struct ContentView: View {
     // nil = the Wallet-style card stack; otherwise the open puzzle.
     @State private var openPuzzle: Puzzle?
     @State private var showAbout = false
-    @State private var showTimer = false
+    // Reopens on the Timer card when a run was in progress at relaunch.
+    @State private var showTimer = TimerCard.hasActiveRun
     @State private var showAlgos = false
     // Timer solve times; outlive the card being closed and are restored from
     // UserDefaults when the app is relaunched.

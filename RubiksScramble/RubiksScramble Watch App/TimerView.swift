@@ -47,6 +47,41 @@ enum TimerCard {
         UserDefaults.standard.set(solves, forKey: solvesKey)
     }
 
+    // A countdown or run in progress, persisted so it survives the screen
+    // sleeping, the system showing the clock, or the app being relaunched.
+    // Stored as the Date the run STARTED (or the countdown ENDS), never a
+    // counter, so the elapsed time is always `now - start`.
+    static let runKey = "timerActiveRun"
+    /// A saved run older than this is stale (forgotten stopwatch), not resumed.
+    static let maxResumeAge: TimeInterval = 3600
+
+    struct SavedRun {
+        let isRunning: Bool   // false = inspection countdown
+        let date: Date        // run start, or countdown end
+    }
+
+    static func saveRun(running: Bool, date: Date) {
+        UserDefaults.standard.set(
+            ["running": running, "at": date.timeIntervalSince1970],
+            forKey: runKey)
+    }
+
+    static func loadRun() -> SavedRun? {
+        guard let d = UserDefaults.standard.dictionary(forKey: runKey),
+              let running = d["running"] as? Bool,
+              let at = d["at"] as? Double else { return nil }
+        let date = Date(timeIntervalSince1970: at)
+        // Drop a stale run (running too long, or a countdown long since over).
+        if Date().timeIntervalSince(date) > maxResumeAge { clearRun(); return nil }
+        return SavedRun(isRunning: running, date: date)
+    }
+
+    static func clearRun() {
+        UserDefaults.standard.removeObject(forKey: runKey)
+    }
+
+    static var hasActiveRun: Bool { loadRun() != nil }
+
     /// "8.42", "1:02.42"; without centiseconds (dimmed always-on display):
     /// "8", "1:02".
     static func format(_ time: TimeInterval, centis: Bool = true) -> String {
@@ -282,11 +317,19 @@ struct TimerScreen: View {
         let total = seconds
         runtime.start()
         guard total > 0 else { beginRun(); return }
-        let end = Date().addingTimeInterval(TimeInterval(total))
+        runCountdown(until: Date().addingTimeInterval(TimeInterval(total)))
+    }
+
+    /// Shows the inspection countdown ending at `end` (persisted) and starts
+    /// the run when it gets there. Haptic ticks already in the past are skipped.
+    private func runCountdown(until end: Date) {
+        countdownTask?.cancel()
         countdownEnd = end
+        TimerCard.saveRun(running: false, date: end)
         phase = .countdown
         countdownTask = Task { @MainActor in
-            for tick in TimerCard.hapticTicks where tick < total {
+            for tick in TimerCard.hapticTicks
+            where TimeInterval(tick) < end.timeIntervalSinceNow {
                 await sleepUntil(until: end.addingTimeInterval(-TimeInterval(tick)))
                 if Task.isCancelled { return }
                 WKInterfaceDevice.current().play(.click)
@@ -298,12 +341,17 @@ struct TimerScreen: View {
         }
     }
 
-    private func beginRun() {
+    /// Starts (or, with an earlier `start`, resumes) the run. The start Date is
+    /// persisted; `runStartUptime` is derived from it for the motion clock.
+    private func beginRun(at start: Date = Date()) {
         countdownTask = nil
-        guard phase == .countdown || phase == .idle || phase == .done else { return }
+        guard phase == .countdown || phase == .idle || phase == .done
+                || phase == .running else { return }
         let startUptime = ProcessInfo.processInfo.systemUptime
-        runStart = Date()
+            - max(0, Date().timeIntervalSince(start))
+        runStart = start
         runStartUptime = startUptime
+        TimerCard.saveRun(running: true, date: start)
         phase = .running
         if motionInsights && PremiumFeatures.isUnlocked {
             recorder.begin(runStart: startUptime)
@@ -318,9 +366,41 @@ struct TimerScreen: View {
     }
 
     private func motionStop(atUptime spike: TimeInterval) {
-        guard phase == .running,
-              spike >= runStartUptime + TimerCard.startLockout else { return }
-        finish(elapsed: spike - runStartUptime)
+        guard phase == .running else { return }
+        // Elapsed at the spike = elapsed now minus how long ago the spike was.
+        // Wall-clock based, so it stays right even if the device slept (the
+        // uptime clock does not count sleep).
+        let sinceSpike = max(0, ProcessInfo.processInfo.systemUptime - spike)
+        let elapsed = Date().timeIntervalSince(runStart) - sinceSpike
+        guard elapsed >= TimerCard.startLockout else { return }
+        finish(elapsed: elapsed)
+    }
+
+    /// Picks up a countdown or run saved before the screen slept, the system
+    /// showed the clock, or the app was relaunched. Elapsed time is simply
+    /// `now - saved start`.
+    private func resume() {
+        guard let saved = TimerCard.loadRun() else { return }
+        timerLog.info("resume, running \(saved.isRunning, privacy: .public)")
+        detector.stop()
+        runtime.start()
+        if saved.isRunning {
+            beginRun(at: saved.date)
+        } else if saved.date > Date() {
+            runCountdown(until: saved.date)
+        } else {
+            // Inspection ended while away: the run began at its end.
+            beginRun(at: saved.date)
+        }
+    }
+
+    /// Stops the live pieces (task, motion, runtime session) but keeps the
+    /// persisted run, so `resume()` can pick it up.
+    private func suspendLive() {
+        countdownTask?.cancel()
+        countdownTask = nil
+        detector.stop()
+        runtime.stop()
     }
 
     private func tapStop() {
@@ -334,6 +414,7 @@ struct TimerScreen: View {
         guard phase == .running else { return }
         detector.stop()
         runtime.stop()
+        TimerCard.clearRun()
         finalTime = max(0, elapsed)
         solves.append(finalTime)
         if solves.count > TimerCard.maxSolves {
@@ -376,6 +457,7 @@ struct TimerScreen: View {
     /// extended runtime session.
     private func reset() {
         timerLog.info("reset")
+        TimerCard.clearRun()
         countdownTask?.cancel()
         countdownTask = nil
         detector.stop()
@@ -594,15 +676,23 @@ struct TimerScreen: View {
         .onChange(of: phase) { old, new in
             timerLog.info("phase \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public)")
         }
-        // Leaving the card (close, swipe, deep link) stops everything.
-        .onDisappear { reset() }
-        // Backgrounding aborts a countdown/run, unless the extended runtime
-        // session is keeping the app alive (wrist down).
+        // Leaving the card (close, swipe, deep link) stops everything. If the
+        // view goes away because the app left the foreground (screen sleep,
+        // clock), keep the saved run for resume().
+        .onAppear { resume() }
+        .onDisappear {
+            if scenePhase == .active { reset() } else { suspendLive() }
+        }
+        // Backgrounded without a live extended runtime session: stop the live
+        // pieces but keep the run (it is just a start Date). Coming back to the
+        // foreground resumes it with the correct elapsed time.
         .onChange(of: scenePhase) { _, new in
             timerLog.info("scenePhase \(String(describing: new), privacy: .public), phase \(String(describing: phase), privacy: .public), runtime running \(runtime.isRunning, privacy: .public)")
-            if new != .active, phase == .countdown || phase == .running,
-               !runtime.isRunning, !runtime.isActiveOrStarting {
-                reset()
+            if new == .active {
+                resume()
+            } else if phase == .countdown || phase == .running,
+                      !runtime.isRunning, !runtime.isActiveOrStarting {
+                suspendLive()
             }
         }
     }
