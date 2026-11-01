@@ -17,6 +17,27 @@ private func play(_ type: WKHapticType) {
     WKInterfaceDevice.current().play(type)
 }
 
+/// "From solved" setup moves: the turns that take a solved cube to a case.
+private struct AlgoSetupText: View {
+    let moves: String
+    var size: CGFloat = 11
+    var perLine = 5
+    var align: TextAlignment = .center
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text("From solved")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(AlgoCardInfo.color)
+            Text(AlgoText.lines(moves, perLine: perLine))
+                .font(.system(size: size, weight: .medium, design: .monospaced))
+                .multilineTextAlignment(align)
+                .minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 // MARK: Root menu
 
 /// The Algorithms card: mode menu (Drill, Practice, Learn, Quiz, Cases,
@@ -159,6 +180,7 @@ private struct AlgoCasePage: View {
     var scrolls = false
     @State private var bigAlg = false
     @State private var showInverse = false
+    @State private var showAufs = false
 
     private var longAlg: Bool { AlgoText.moveCount(algoCase.alg) > 12 }
 
@@ -185,7 +207,7 @@ private struct AlgoCasePage: View {
 
     private var compact: some View {
         VStack(spacing: 3) {
-            AlgoCaseView(algoCase: algoCase, size: longAlg ? 56 : 72)
+            AlgoCaseView(algoCase: algoCase, size: longAlg ? 44 : 56)
             Text(algoCase.name)
                 .font(.system(size: 15, weight: .bold))
                 .lineLimit(1)
@@ -202,6 +224,7 @@ private struct AlgoCasePage: View {
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.5)
                 .lineLimit(6)
+            AlgoSetupText(moves: algoCase.setup, size: 9, perLine: 6)
             inverseLine
         }
         .padding(.horizontal, 4)
@@ -218,6 +241,27 @@ private struct AlgoCasePage: View {
                                   weight: .semibold, design: .monospaced))
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.6)
+                AlgoSetupText(moves: algoCase.setup, size: 13, perLine: 4)
+                if !algoCase.aufs.isEmpty {
+                    Button { showAufs.toggle() } label: {
+                        Text(showAufs ? "Hide AUF setups" : "AUF setups (\(algoCase.aufs.count))")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .buttonStyle(.bordered)
+                    if showAufs {
+                        ForEach(Array(algoCase.aufs.enumerated()), id: \.offset) { item in
+                            VStack(spacing: 1) {
+                                Text("AUF \(item.element.pre.isEmpty ? "-" : item.element.pre) | \(item.element.post.isEmpty ? "-" : item.element.post)")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Text(AlgoText.lines(item.element.setup, perLine: 4))
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .multilineTextAlignment(.center)
+                                    .minimumScaleFactor(0.6)
+                            }
+                        }
+                    }
+                }
                 inverseLine
             }
             .padding(.horizontal, 4)
@@ -458,11 +502,7 @@ private struct AlgoDrillView: View {
                                     .frame(width: 6, height: 6)
                             }
                         }
-                        Text(AlgoText.lines(variant?.setup ?? c.setup, perLine: 4))
-                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                            .multilineTextAlignment(.leading)
-                            .minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity)
+                        AlgoSetupText(moves: variant?.setup ?? c.setup, size: 14, perLine: 4)
                             .padding(6)
                             .background(RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.black.opacity(0.35)))
@@ -551,6 +591,7 @@ private struct AlgoDrillView: View {
                             .multilineTextAlignment(.leading)
                             .minimumScaleFactor(0.6)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        AlgoSetupText(moves: variant?.setup ?? c.setup, size: 10, perLine: 6)
                     }
                     .padding(.horizontal, 4)
                 }

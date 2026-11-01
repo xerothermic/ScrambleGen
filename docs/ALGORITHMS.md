@@ -15,6 +15,9 @@ Fifth card in the Wallet stack (3x3, Square-1, Timer, **Algorithms**, About). Pu
 - **Set**: All, OLL, PLL, 2-look OLL (3 edge steps + OLL 21-27), 2-look PLL (Aa, E, Ua, Ub, H, Z), Inverse pairs, Weak list (boxes 1-2 or last rating Not yet). Stored in `@AppStorage("algoFilter")`.
 - **Progress**: known (box 4-5) per OLL/PLL, box histogram, due count, per-case best time, reset.
 
+## From-solved setup
+Every case shows `setup` (the moves that take a SOLVED cube to the case; it is the inverse of `alg`, and `solve` undoes it) as "From solved" in Learn (compact page), the big alg view (plus a button listing each AUF variant's own setup), the Drill/Practice ready screen (the variant's setup, which is exactly the scramble shown) and the reveal screen.
+
 ## Leitner and persistence
 Boxes 1-5, intervals 0/1/2/4/8/16 days (`AlgoStore.intervals`). Good / Know it moves up one box (unseen goes to 2), Not yet / Slow goes to box 1. `bestMs` is the fastest time of a Good rating; `lastMs` is every time. `UserDefaults` key `algoProgress` (JSON, `[caseID: AlgoProgress]`), plus `algoFilter` and `algoInverseBonus`.
 
