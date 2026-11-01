@@ -123,7 +123,7 @@ struct ScrambleComplicationView: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.widgetRenderingMode) private var renderingMode
 
-    private var puzzle: Puzzle { entry.puzzle }
+    private var puzzle: ComplicationTarget { entry.puzzle }
     private var fullColor: Bool { renderingMode == .fullColor }
 
     private var title: String {
