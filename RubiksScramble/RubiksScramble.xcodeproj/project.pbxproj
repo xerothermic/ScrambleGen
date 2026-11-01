@@ -32,6 +32,10 @@
 		AA00000000000000000E0003 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0003 /* StatsView.swift */; };
 		AA00000000000000000E0004 /* MotionCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0004 /* MotionCapture.swift */; };
 		AA00000000000000000E0005 /* PauseAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0005 /* PauseAnalysis.swift */; };
+		AA0000000000000000000033 /* AlgoArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* AlgoArt.swift */; };
+		AA0000000000000000000035 /* AlgoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000034 /* AlgoData.swift */; };
+		AA0000000000000000000037 /* AlgoScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000036 /* AlgoScreens.swift */; };
+		AA0000000000000000000039 /* AlgoCases.json in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000038 /* AlgoCases.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -99,6 +103,10 @@
 		AA00000000000000000D0003 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0004 /* MotionCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionCapture.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0005 /* PauseAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseAnalysis.swift; sourceTree = "<group>"; };
+		AA0000000000000000000032 /* AlgoArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoArt.swift; sourceTree = "<group>"; };
+		AA0000000000000000000034 /* AlgoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoData.swift; sourceTree = "<group>"; };
+		AA0000000000000000000036 /* AlgoScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoScreens.swift; sourceTree = "<group>"; };
+		AA0000000000000000000038 /* AlgoCases.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = AlgoCases.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -156,6 +164,10 @@
 				AA00000000000000000D0003 /* StatsView.swift */,
 				AA00000000000000000D0004 /* MotionCapture.swift */,
 				AA00000000000000000D0005 /* PauseAnalysis.swift */,
+				AA0000000000000000000032 /* AlgoArt.swift */,
+				AA0000000000000000000034 /* AlgoData.swift */,
+				AA0000000000000000000036 /* AlgoScreens.swift */,
+				AA0000000000000000000038 /* AlgoCases.json */,
 				AA0000000000000000000016 /* Assets.xcassets */,
 				AA0000000000000000000020 /* PrivacyInfo.xcprivacy */,
 			);
@@ -274,6 +286,7 @@
 			files = (
 				AA0000000000000000000017 /* Assets.xcassets in Resources */,
 				AA0000000000000000000021 /* PrivacyInfo.xcprivacy in Resources */,
+				AA0000000000000000000039 /* AlgoCases.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,6 +319,9 @@
 				AA00000000000000000E0005 /* PauseAnalysis.swift in Sources */,
 				AA0000000000000000000023 /* PuzzleStyle.swift in Sources */,
 				AA0000000000000000000031 /* PuzzleArtDrawing.swift in Sources */,
+				AA0000000000000000000033 /* AlgoArt.swift in Sources */,
+				AA0000000000000000000035 /* AlgoData.swift in Sources */,
+				AA0000000000000000000037 /* AlgoScreens.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
