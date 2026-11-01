@@ -30,6 +30,9 @@ struct ContentView: View {
     // nil = the Wallet-style card stack; otherwise the open puzzle.
     @State private var openPuzzle: Puzzle?
     @State private var showAbout = false
+    @State private var showTimer = false
+    // Timer solve times for this app session; outlive the card being closed.
+    @State private var timerSolves: [TimeInterval] = []
     @Namespace private var cardSpace
 
     // Close affordance: invisible until the screen is touched, then a small
@@ -43,7 +46,7 @@ struct ContentView: View {
     private func close() {
         hideTask?.cancel()
         showClose = false
-        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false }
+        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false }
     }
 
     private func scheduleHide() {
@@ -73,6 +76,8 @@ struct ContentView: View {
             PuzzlePage(puzzle: open, lengths: $lengths, moves: $moves,
                        page: Binding(get: { pages[open] ?? 0 },
                                      set: { pages[open] = $0 }))
+        } else if showTimer {
+            TimerScreen(solves: $timerSolves)
         } else {
             AboutView()
         }
@@ -111,13 +116,16 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if openPuzzle != nil || showAbout {
+            if openPuzzle != nil || showAbout || showTimer {
                 openContent
                     .background(
                         // The tapped card grows into this tinted full-screen panel.
                         RoundedRectangle(cornerRadius: 18)
-                            .fill((openPuzzle?.cardColor ?? AboutCard.color).opacity(0.35))
-                            .matchedGeometryEffect(id: openPuzzle?.rawValue ?? AboutCard.id,
+                            .fill((openPuzzle?.cardColor
+                                   ?? (showTimer ? TimerCard.color : AboutCard.color))
+                                .opacity(0.35))
+                            .matchedGeometryEffect(id: openPuzzle?.rawValue
+                                                   ?? (showTimer ? TimerCard.id : AboutCard.id),
                                                    in: cardSpace)
                             .ignoresSafeArea()
                     )
@@ -147,6 +155,8 @@ struct ContentView: View {
                     withAnimation(Self.spring) { openPuzzle = option }
                 }, onAbout: {
                     withAnimation(Self.spring) { showAbout = true }
+                }, onTimer: {
+                    withAnimation(Self.spring) { showTimer = true }
                 })
                 .transition(.opacity)
             }
@@ -157,6 +167,7 @@ struct ContentView: View {
             guard let target = Puzzle(deepLink: url) else { return }
             puzzle = target
             showAbout = false
+            showTimer = false
             withAnimation(Self.spring) { openPuzzle = target }
         }
         .onAppear {
@@ -174,60 +185,23 @@ private struct CardStack: View {
     let space: Namespace.ID
     let onPick: (Puzzle) -> Void
     let onAbout: () -> Void
+    let onTimer: () -> Void
 
-    private let cardHeight: CGFloat = 92
-    private let peek: CGFloat = 50
+    private let cardHeight: CGFloat = 84
+    private let frontCardHeight: CGFloat = 104
+    private let aboutCardHeight: CGFloat = 64
+    private let gap: CGFloat = 8
 
     private func color(_ option: Puzzle) -> Color { option.cardColor }
 
-    /// Tiny solved-state map of the puzzle, reusing the real map drawing code.
+    /// Card picture: the approved "A" artwork, same drawing code as the
+    /// complications (PuzzleArtDrawing).
     @ViewBuilder
-    private func preview(_ option: Puzzle) -> some View {
-        switch option {
-        case .cube3x3:
-            let cube = CubeState()
-            let cell: CGFloat = 3.5
-            let face: CGFloat = cell * 3 + 1
-            VStack(spacing: 1) {
-                ForEach(0..<3, id: \.self) { row in
-                    HStack(spacing: 1) {
-                        ForEach(0..<4, id: \.self) { col in
-                            if let f = Self.net[row][col] {
-                                miniFace(cube, f, cell: cell)
-                            } else {
-                                Color.clear.frame(width: face, height: face)
-                            }
-                        }
-                    }
-                }
-            }
-        case .square1:
-            let state = Square1State()
-            Canvas { context, size in
-                Square1Drawing.draw(state, in: &context, size: size)
-            }
-            .frame(width: 26, height: 50)
+    private func preview(_ option: Puzzle, size: CGFloat) -> some View {
+        Canvas { context, canvas in
+            PuzzleArtDrawing.drawColour(&context, puzzle: option, size: canvas)
         }
-    }
-
-    private static let net: [[CubeFace?]] = [
-        [nil, .up, nil, nil],
-        [.left, .front, .right, .back],
-        [nil, .down, nil, nil],
-    ]
-
-    private func miniFace(_ cube: CubeState, _ face: CubeFace, cell: CGFloat) -> some View {
-        VStack(spacing: 0.5) {
-            ForEach(0..<3, id: \.self) { r in
-                HStack(spacing: 0.5) {
-                    ForEach(0..<3, id: \.self) { c in
-                        Rectangle()
-                            .fill(cube.color(face: face, row: r, col: c))
-                            .frame(width: cell, height: cell)
-                    }
-                }
-            }
-        }
+        .frame(width: size, height: size)
     }
 
     private var aboutCard: some View {
@@ -243,12 +217,13 @@ private struct CardStack: View {
                 }
                 Spacer(minLength: 4)
                 Image(systemName: "info.circle")
-                    .font(.system(size: 34, weight: .light))
+                    .font(.system(size: 28, weight: .light))
             }
             .foregroundStyle(.white)
+            .opacity(0.9)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: cardHeight)
+            .frame(height: aboutCardHeight)
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(LinearGradient(
@@ -275,16 +250,66 @@ private struct CardStack: View {
         .accessibilityLabel("About, version \(AboutCard.versionString)")
     }
 
+    private var timerCard: some View {
+        Button(action: onTimer) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Timer")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Solve timer")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                // Stopwatch icon with a sample time.
+                HStack(spacing: 4) {
+                    Image(systemName: "stopwatch")
+                        .font(.system(size: 34, weight: .light))
+                    Text("8.42")
+                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [TimerCard.color, TimerCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: TimerCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Timer")
+    }
+
     var body: some View {
-        // Crown / touch scrolls the stack. Cards overlap via negative spacing,
-        // later cards on top (About first, 3x3 last); scrollTransition tilts each card in perspective
-        // (like Wallet) as it nears the top or bottom edge.
+        // Crown / touch scrolls the stack. Cards are laid out vertically with
+        // real spacing (no overlap, every title and picture stays visible);
+        // scrollTransition tilts each card in perspective (like Wallet) as it
+        // nears the top or bottom edge.
         ScrollView {
-            VStack(spacing: peek - cardHeight) {
-                // About is the back card (top of the screen); the 3x3 card is
-                // the front card and sits fully visible at the bottom.
-                aboutCard
-                ForEach(Array(Puzzle.allCases.reversed()), id: \.self) { option in
+            VStack(spacing: gap) {
+                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, About
+                // (last, smallest and quietest).
+                ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
                     Button {
                         onPick(option)
                     } label: {
@@ -298,12 +323,12 @@ private struct CardStack: View {
                                 Spacer()
                             }
                             Spacer(minLength: 4)
-                            preview(option)
+                            preview(option, size: index == 0 ? 72 : 56)
                         }
                         .foregroundStyle(.white)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(height: cardHeight)
+                        .frame(height: index == 0 ? frontCardHeight : cardHeight)
                         .background(
                             RoundedRectangle(cornerRadius: 18)
                                 .fill(LinearGradient(
@@ -331,6 +356,8 @@ private struct CardStack: View {
                     }
                     .accessibilityLabel("\(option.name) scramble")
                 }
+                timerCard
+                aboutCard
             }
             .padding(.horizontal, 4)
             .padding(.top, 6)
@@ -396,7 +423,7 @@ private struct AboutView: View {
                         .foregroundStyle(.secondary)
                         .opacity(0.8)
                 }
-                Text("3×3 and Square-1 scrambles with puzzle maps.")
+                Text("3×3 and Square-1 scrambles with puzzle maps, plus a solve timer.")
                     .font(.caption2)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
