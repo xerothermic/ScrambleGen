@@ -230,6 +230,23 @@ channel.
 
 ---
 
+## TestFlight "What to Test" notes
+
+After each upload a final step (`ci/set-testflight-notes.py`, python3 and
+openssl only) signs an ES256 token with the API key, polls App Store Connect
+(every 30 s, up to 20 min) until the build is listed and processed, then sets
+the en-US "What to Test" text. It contains the branch, short commit SHA,
+marketing version and build number, the open PR's title (if any) and the
+subject lines of the commits in the push (last 5 if unknown; CI's "Build
+number" commits and Co-Authored-By lines are left out), capped at 4000
+characters. The step is `continue-on-error`: a timeout or API error only logs
+a warning and never fails the run. Commit messages and PR titles are untrusted
+and are handled as data, never interpolated into shell.
+
+To edit by hand: App Store Connect > your app > TestFlight > the build >
+Test Details. The API key needs the **App Manager** (or Developer) role to
+edit beta build details.
+
 ## Reusing this in another repo
 
 ```sh

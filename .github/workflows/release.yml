@@ -576,6 +576,21 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
+      # Own lightweight step: polls App Store Connect (up to 20 min) until the
+      # build has processed, then sets its TestFlight "What to Test" text.
+      # Never fails the run. Commit messages and PR titles are untrusted and
+      # reach the script only as data. See docs/TESTFLIGHT.md.
+      - name: Set TestFlight "What to Test"
+        if: ${{ !inputs.dry_run && success() }}
+        continue-on-error: true
+        timeout-minutes: 25
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: python3 -I ci/set-testflight-notes.py
+
       - name: Summarise
         if: always()
         run: |
