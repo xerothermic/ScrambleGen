@@ -15,7 +15,7 @@ struct ContentView: View {
     @Namespace private var cardSpace
 
     // Close affordance: invisible until the screen is touched, then a small
-    // xmark that fades out again ~3 s after the last touch.
+    // xmark that fades out again ~2.5 s after the last touch.
     @State private var showClose = false
     @State private var touching = false
     @State private var hideTask: Task<Void, Never>?
@@ -31,7 +31,7 @@ struct ContentView: View {
     private func scheduleHide() {
         hideTask?.cancel()
         hideTask = Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
             guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.5)) { showClose = false }
         }
