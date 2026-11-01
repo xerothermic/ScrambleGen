@@ -151,6 +151,14 @@ struct ContentView: View {
                 .transition(.opacity)
             }
         }
+        // Complication tap: scramblegen://puzzle/<slug> opens that puzzle's
+        // page, same state change as tapping its wallet card.
+        .onOpenURL { url in
+            guard let target = Puzzle(deepLink: url) else { return }
+            puzzle = target
+            showAbout = false
+            withAnimation(Self.spring) { openPuzzle = target }
+        }
         .onAppear {
             for option in Puzzle.allCases where moves[option] == nil {
                 moves[option] = option.generate(
@@ -395,16 +403,6 @@ private struct AboutView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 24)
             .padding(.horizontal, 8)
-        }
-    }
-}
-
-extension Puzzle {
-    /// Card / panel colour for this puzzle.
-    var cardColor: Color {
-        switch self {
-        case .cube3x3: Color(red: 0.19, green: 0.82, blue: 0.35)  // cube green
-        case .square1: Color(red: 0.81, green: 0.13, blue: 0.16)  // WCA front red
         }
     }
 }

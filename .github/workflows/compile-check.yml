@@ -1,0 +1,71 @@
+name: Compile check
+
+# Manual, unsigned simulator build: proves the watch app AND the embedded
+# complication extension compile, without secrets, signing or an upload.
+# Cheap on purpose (no archive, no build-number bump). Start it with
+#   gh workflow run compile-check.yml --ref <branch>
+# It also checks the extension carries the SAME CFBundleShortVersionString and
+# CFBundleVersion as the watch app, which App Store Connect requires.
+
+# gh cannot dispatch a workflow that is not on the default branch yet (HTTP
+# 404), so until this file reaches main it ALSO runs on a push to the
+# complication branch that changes this file (touch the "run:" line below to
+# re-run). Delete the push trigger once the file is on main.
+# run: 1
+on:
+  workflow_dispatch:
+  push:
+    branches: [bob/watch-complication]
+    paths: ['.github/workflows/compile-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          if [ -n "${{ vars.XCODE_VERSION }}" ]; then
+            sudo xcode-select -s "/Applications/Xcode_${{ vars.XCODE_VERSION }}.app/Contents/Developer"
+          fi
+          xcode-select -p
+          xcodebuild -version
+
+      - name: Build for watchOS Simulator
+        run: |
+          set -euo pipefail
+          . ci/release.config
+          set -o pipefail
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=watchOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            CURRENT_PROJECT_VERSION=42 \
+            2>&1 | tee "$RUNNER_TEMP/build.log" | tail -n 400
+          echo "BUILD SUCCEEDED"
+
+      - name: Check extension is embedded with matching versions
+        run: |
+          set -euo pipefail
+          APP="$(find "$RUNNER_TEMP/dd" -type d -name 'RubiksScramble Watch App.app' | head -1)"
+          APPEX="$(find "$APP" -type d -name '*.appex' | head -1)"
+          echo "app:   $APP"
+          echo "appex: ${APPEX:-<none>}"
+          [ -n "$APPEX" ] || { echo "::error::No .appex embedded in the watch app."; exit 1; }
+          pb() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Info.plist"; }
+          for k in CFBundleShortVersionString CFBundleVersion; do
+            a="$(pb "$APP" $k)"; e="$(pb "$APPEX" $k)"
+            echo "$k: app=$a extension=$e"
+            [ "$a" = "$e" ] || { echo "::error::$k differs between watch app and extension."; exit 1; }
+          done
+          echo "extension point: $(pb "$APPEX" NSExtension:NSExtensionPointIdentifier)"
+          echo "extension id:    $(pb "$APPEX" CFBundleIdentifier)"
