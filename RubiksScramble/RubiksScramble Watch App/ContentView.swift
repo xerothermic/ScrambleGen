@@ -83,15 +83,18 @@ struct ContentView: View {
                             ZStack {
                                 Circle().fill(.ultraThinMaterial)
                                 Image(systemName: "xmark")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: 20, weight: .bold))
                             }
-                            .frame(width: 26, height: 26)
+                            .frame(width: 42, height: 42)
+                            // Inset so the circle clears the rounded screen corner.
+                            .padding(8)
                             .opacity(showClose ? 1 : 0)
-                            .frame(width: 60, height: 60, alignment: .topLeading)
+                            .frame(width: 70, height: 70, alignment: .topLeading)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Close")
+                        .ignoresSafeArea()
                     }
                     .transition(.opacity)
             } else {
