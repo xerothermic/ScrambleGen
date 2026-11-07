@@ -520,6 +520,17 @@ struct TimerScreen: View {
                 }
             }
             .modifier(CloseAwareTitle(title: "Timer"))
+            // Average-of-5 calculator (not offered mid-run).
+            .toolbar {
+                if phase == .idle || phase == .done {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink(destination: Ao5Screen()) {
+                            Image(systemName: "5.square")
+                        }
+                        .accessibilityLabel("Average of 5")
+                    }
+                }
+            }
         }
         .onChange(of: phase) { old, new in
             timerLog.info("phase \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public)")
