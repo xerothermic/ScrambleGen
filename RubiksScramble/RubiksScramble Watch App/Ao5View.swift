@@ -19,7 +19,14 @@ final class Ao5Dial {
 
     static let maxMillis = 59 * 60_000 + 59_999   // 59:59.999
 
+    /// Programmatic change (slot select, Set, New, +2/DNF): never clicks, and
+    /// re-anchors the haptic detent to the new value.
     func set(millis c: Int, penalty p: Ao5Penalty) {
+        apply(millis: c, penalty: p)
+        hapticIdx = millis / interval
+    }
+
+    private func apply(millis c: Int, penalty p: Ao5Penalty) {
         let cc = min(max(c, 0), Self.maxMillis)
         if cc != millis { millis = cc }
         if p != penalty { penalty = p }
@@ -32,13 +39,14 @@ final class Ao5Dial {
     private var interval = Ao5Settings.defaultInterval
     private var baseStep = Ao5Settings.defaultStep
     private var speedUp = Ao5Settings.defaultSpeedUp
-    private var lastHaptic: TimeInterval = 0
+    private var hapticIdx = 0            // detent index (millis / interval) last clicked/synced
     private var lastEvent: TimeInterval = 0
     private var speed = 0.0              // smoothed crown units per second
 
     func configure(_ s: Ao5Settings.Snapshot) {
         feedback = s.feedback
         interval = max(1, s.interval)
+        hapticIdx = millis / interval
         baseStep = max(1, s.step)
         speedUp = s.speedUp
     }
@@ -48,7 +56,6 @@ final class Ao5Dial {
     func resetMotion() {
         speed = 0
         lastEvent = 0
-        lastHaptic = 0
     }
 
     /// ms per crown unit for a given turn speed (units/s). With
@@ -66,8 +73,7 @@ final class Ao5Dial {
     /// Crown step: `units` crown units (1 unit = 1 detent-ish). Speed is the
     /// smoothed units/s over recent events (a pause > 0.3 s restarts at slow),
     /// mapped to a ms-per-unit tier. One haptic when the value crosses a
-    /// multiple of the feedback interval (integer compare; at most one per
-    /// 30 ms). No allocations.
+    /// multiple of the feedback interval (see hysteresis below). No allocations.
     func addCrown(_ units: Int) {
         guard units != 0 else { return }
         let now = ProcessInfo.processInfo.systemUptime
@@ -81,10 +87,16 @@ final class Ao5Dial {
         lastEvent = now
         let ms = units * step(forSpeed: speed)
         let old = millis
-        set(millis: millis + ms, penalty: penalty)
-        if feedback, old != millis, old / interval != millis / interval,
-           now - lastHaptic >= 0.03 {
-            lastHaptic = now
+        apply(millis: millis + ms, penalty: penalty)
+        guard feedback, old != millis else { return }   // clamped = no click
+        // One click per event that moves the value across a detent boundary
+        // (multi-boundary jumps coalesce into one). Hysteresis: reversing
+        // must go a quarter interval past the boundary, so wobbling on a
+        // boundary does not chatter.
+        let idx = millis / interval
+        let margin = interval / 4
+        if idx > hapticIdx || (idx < hapticIdx && millis + margin < hapticIdx * interval) {
+            hapticIdx = idx
             WKInterfaceDevice.current().play(.click)
         }
     }
