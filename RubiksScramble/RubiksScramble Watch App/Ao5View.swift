@@ -27,18 +27,46 @@ final class Ao5Dial {
         if can != canSet { canSet = can }
     }
 
-    /// Crown step. Plays ONE haptic tick when the value crosses a multiple of
-    /// 0.5 s in either direction (integer compare of millis / 500; a fast
-    /// spin that crosses several still ticks once). No allocations.
-    func add(_ delta: Int) {
-        let old = millis
-        set(millis: millis + delta, penalty: penalty)
-        if old / Self.tickMillis != millis / Self.tickMillis {
-            WKInterfaceDevice.current().play(.click)
-        }
+    // Crown settings, loaded once via `configure` (not per tick).
+    private var feedback = Ao5Settings.defaultFeedback
+    private var interval = Ao5Settings.defaultInterval
+    private var unitsPerMilli = Ao5Sensitivity.veryLow.unitsPerMilli
+    private(set) var crownSensitivity = Ao5Sensitivity.veryLow.crownSensitivity
+    private var accel = false
+    private var remainder = 0            // crown units not yet worth 1 ms
+    private var lastHaptic: TimeInterval = 0
+
+    func configure(_ s: Ao5Settings.Snapshot) {
+        feedback = s.feedback
+        interval = max(1, s.interval)
+        unitsPerMilli = s.sensitivity.unitsPerMilli
+        crownSensitivity = s.sensitivity.crownSensitivity
+        accel = s.accel
+        remainder = 0
     }
 
-    static let tickMillis = 500
+    /// Crown step: `units` raw crown detents (1 unit = 1 ms at the finest
+    /// setting). Slower settings need several units per ms (remainder is
+    /// carried). Optional acceleration (off by default) x5 only on a clearly
+    /// fast spin. One haptic when the value crosses a multiple of the
+    /// feedback interval (integer compare; a spin crossing several still
+    /// ticks once; at most one per 30 ms). No allocations.
+    func addCrown(_ units: Int) {
+        remainder += units
+        var ms = remainder / unitsPerMilli      // truncates toward zero
+        remainder -= ms * unitsPerMilli
+        if accel && abs(units) >= 12 { ms *= 5 }
+        guard ms != 0 else { return }
+        let old = millis
+        set(millis: millis + ms, penalty: penalty)
+        if feedback, old != millis, old / interval != millis / interval {
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastHaptic >= 0.03 {
+                lastHaptic = now
+                WKInterfaceDevice.current().play(.click)
+            }
+        }
+    }
 
     func toggle(_ p: Ao5Penalty) { set(millis: millis, penalty: penalty == p ? .none : p) }
 }
@@ -69,14 +97,12 @@ private struct Ao5DialTime: View {
             .focusable()
             .focused($focused)
             .digitalCrownRotation($crown, from: 0, through: Self.crownMid * 2, by: 1,
-                                  sensitivity: .high, isContinuous: false,
+                                  sensitivity: dial.crownSensitivity, isContinuous: false,
                                   isHapticFeedbackEnabled: false)
             .onChange(of: crown) { old, new in
-                // Half the old sensitivity: 1 detent = 5 ms; a fast spin
-                // (3+ detents at once) = 50 ms each.
                 let d = Int((new - old).rounded())
                 guard d != 0 else { return }
-                dial.add(abs(d) >= 3 ? d * 50 : d * 5)
+                dial.addCrown(d)
             }
             .onAppear { focused = true }
     }
@@ -122,8 +148,8 @@ private struct Ao5Actions: View {
 
 /// Average-of-5 calculator: set five competition times, get the WCA Ao5.
 /// Its own top-level card in the card stack (`Ao5Card`).
-/// The Digital Crown dials the time (5 ms steps; a fast spin jumps 50 ms per
-/// step; one haptic tick each time it crosses a multiple of 0.5 s). Tapping a slot selects that solve (loading its time if already set);
+/// The Digital Crown dials the time (1 ms resolution, slow by default; optional
+/// fast-spin acceleration; haptic tick every N ms, see Customization). Tapping a slot selects that solve (loading its time if already set);
 /// "Set" stores the dialled time, with the +2 / DNF toggles, in the selected
 /// slot and moves on to the next empty one. The best single and the average
 /// (once all five are set) update live. Nothing is saved; leaving the screen
@@ -234,5 +260,6 @@ struct Ao5Screen: View {
         }
         .padding(.horizontal, 4)
         .navigationTitle("")   // no title: reclaim the header height
+        .onAppear { dial.configure(Ao5Settings.load()) }
     }
 }
