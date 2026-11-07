@@ -99,3 +99,52 @@ enum AverageOfFive {
         return seconds * 1000 + ms
     }
 }
+
+/// Digital Crown delta -> milliseconds. Pure (time is passed in) so it is
+/// unit-testable. The crown binding is a Double whose unit is roughly one
+/// revolution; `detentsPerUnit` turns that into detents (default ~150 per
+/// revolution, i.e. ~2.4 degrees each). Fractional detents are CARRIED, never
+/// truncated, so slow turns always add up; every whole detent is worth at
+/// least the base step (>= 1 ms). Speed (detents/s, smoothed, restarting
+/// after a 0.3 s pause) only raises the step when acceleration is on.
+struct Ao5CrownMapper {
+    static let detentsPerUnit = 150.0
+
+    var baseStep = 1
+    var speedUp = true
+    private(set) var carry = 0.0           // fractional detents not yet applied
+    private var speed = 0.0                // smoothed detents per second
+    private var lastTime: Double?
+
+    mutating func reset() { carry = 0; speed = 0; lastTime = nil }
+
+    /// ms per detent for a turn speed. Slow = base step, never suppressed.
+    static func step(forSpeed v: Double, base: Int, speedUp: Bool) -> Int {
+        guard speedUp else { return base }
+        let tier: Int
+        if v < 25 { tier = 1 }
+        else if v < 60 { tier = 10 }
+        else if v < 130 { tier = 100 }
+        else { tier = 1000 }
+        return max(base, tier)
+    }
+
+    /// `delta` = change of the crown binding since the last event (any size,
+    /// including tiny fractions); `now` = monotonic seconds. Returns signed ms.
+    mutating func millis(forDelta delta: Double, now: Double) -> Int {
+        guard delta != 0 else { return 0 }
+        var detents = delta * Self.detentsPerUnit
+        if (detents > 0 && carry < 0) || (detents < 0 && carry > 0) { carry = 0 }   // reversal
+        if let t = lastTime, now - t <= 0.3 {
+            let inst = abs(detents) / max(now - t, 0.01)
+            speed = speed == 0 ? inst : speed * 0.5 + inst * 0.5
+        } else {
+            speed = 0
+        }
+        lastTime = now
+        detents += carry
+        let whole = detents.rounded(.towardZero)
+        carry = detents - whole
+        return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), speedUp: speedUp)
+    }
+}

@@ -43,4 +43,47 @@ for _ in range(200000):
     assert (a, b) == reference(solves), solves
 assert compute([(9000, "none")] * 5)[0] == {0, 4}
 assert compute([(1, "none"), (333, "none"), (333, "none"), (335, "none"), (9999, "none")])[1] == 334
+
+# --- crown mapper mirror (Ao5CrownMapper) ---
+DPU = 150.0
+def tier(v, base, speed_up):
+    if not speed_up: return base
+    t = 1 if v < 25 else 10 if v < 60 else 100 if v < 130 else 1000
+    return max(base, t)
+
+class Mapper:
+    def __init__(s, base=1, speed_up=True): s.base, s.up, s.carry, s.speed, s.t = base, speed_up, 0.0, 0.0, None
+    def feed(s, delta, now):
+        if delta == 0: return 0
+        d = delta * DPU
+        if (d > 0 and s.carry < 0) or (d < 0 and s.carry > 0): s.carry = 0.0
+        if s.t is not None and now - s.t <= 0.3:
+            inst = abs(d) / max(now - s.t, 0.01)
+            s.speed = inst if s.speed == 0 else s.speed * 0.5 + inst * 0.5
+        else:
+            s.speed = 0.0
+        s.t = now
+        d += s.carry
+        whole = int(d)  # toward zero
+        s.carry = d - whole
+        return whole * tier(s.speed, max(1, s.base), s.up)
+
+m = Mapper(); tot = 0; t = 0.0
+for _ in range(1000):
+    t += 0.5; tot += m.feed(0.001, t)
+assert tot == 150, tot                       # slow full unit = 150 ms
+m = Mapper(); assert m.feed(1 / DPU, 1) == 1 and m.feed(-1 / DPU, 5) == -1
+m = Mapper(); assert (m.feed(0.004, 1), m.feed(-0.004, 2), m.feed(-0.004, 3)) == (0, 0, -1)
+m = Mapper(); m.feed(0.02, 1.00); assert m.feed(0.02, 1.02) == 3000
+random.seed(9)
+for _ in range(2000):   # slow one-direction turn: sum of ms == detents moved (+-1), no lost movement
+    m = Mapper(); t = 0.0; units = 0.0; tot = 0
+    for _ in range(200):
+        t += 1.0; dlt = random.random() * 0.01
+        units += dlt; tot += m.feed(dlt, t)
+    assert abs(tot - units * DPU) < 1.0 + 1e-6
+# clamping (mirrors Ao5Dial.apply)
+MAXMS = 59 * 60000 + 59999
+clamp = lambda v: min(max(v, 0), MAXMS)
+assert clamp(-5) == 0 and clamp(MAXMS + 1000) == MAXMS
 print("ok")

@@ -112,4 +112,51 @@ final class AverageOfFiveTests: XCTestCase {
         XCTAssertEqual(AverageOfFive.millis(fromDigits: "175999"), 135999)   // 1:75.999 = 2:15.999
         XCTAssertEqual(AverageOfFive.millis(fromDigits: "1234567"), 754567)  // 12:34.567
     }
+
+    // MARK: Crown mapping
+
+    func testTinyDeltasAccumulate() {
+        var m = Ao5CrownMapper()
+        var total = 0
+        var t = 0.0
+        for _ in 0..<100 { t += 0.5; total += m.millis(forDelta: 0.001, now: t) }   // 0.15 detent each
+        XCTAssertEqual(total, 15)                                                    // 0.1 rev = 15 detents
+    }
+
+    func testFullSlowRevolutionYieldsAbout150ms() {
+        var m = Ao5CrownMapper()
+        var total = 0
+        var t = 0.0
+        for _ in 0..<1000 { t += 0.5; total += m.millis(forDelta: 0.001, now: t) }   // 1.0 unit
+        XCTAssertEqual(total, 150)
+    }
+
+    func testNeverZeroForWholeDetent() {
+        var m = Ao5CrownMapper()
+        XCTAssertEqual(m.millis(forDelta: 1.0 / Ao5CrownMapper.detentsPerUnit, now: 1), 1)
+        XCTAssertEqual(m.millis(forDelta: -1.0 / Ao5CrownMapper.detentsPerUnit, now: 5), -1)
+    }
+
+    func testReversalDropsOppositeCarry() {
+        var m = Ao5CrownMapper()
+        XCTAssertEqual(m.millis(forDelta: 0.004, now: 1), 0)     // 0.6 detent carried
+        XCTAssertEqual(m.millis(forDelta: -0.004, now: 2), 0)    // carry cleared, -0.6 carried
+        XCTAssertEqual(m.millis(forDelta: -0.004, now: 3), -1)   // -1.2 -> -1
+    }
+
+    func testSpeedTiersAndBase() {
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 1, base: 1, speedUp: true), 1)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, speedUp: true), 10)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 100, base: 1, speedUp: true), 100)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 1, speedUp: true), 1000)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 5, speedUp: false), 5)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 1, base: 10, speedUp: true), 10)
+    }
+
+    func testFastSpinAccelerates() {
+        var m = Ao5CrownMapper()
+        _ = m.millis(forDelta: 0.02, now: 1.00)
+        let ms = m.millis(forDelta: 0.02, now: 1.02)      // 3 detents / 20 ms = 150/s
+        XCTAssertEqual(ms, 3000)
+    }
 }

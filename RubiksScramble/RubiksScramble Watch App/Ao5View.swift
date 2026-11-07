@@ -37,62 +37,29 @@ final class Ao5Dial {
     // Crown settings, loaded via `configure` (not per tick).
     private var feedback = Ao5Settings.defaultFeedback
     private var interval = Ao5Settings.defaultInterval
-    private var baseStep = Ao5Settings.defaultStep
-    private var speedUp = Ao5Settings.defaultSpeedUp
-    private var hapticIdx = 0            // detent index (millis / interval) last clicked/synced
-    private var lastEvent: TimeInterval = 0
-    private var speed = 0.0              // smoothed crown units per second
+    private var mapper = Ao5CrownMapper()
 
     func configure(_ s: Ao5Settings.Snapshot) {
         feedback = s.feedback
         interval = max(1, s.interval)
         hapticIdx = millis / interval
-        baseStep = max(1, s.step)
-        speedUp = s.speedUp
+        mapper.baseStep = max(1, s.step)
+        mapper.speedUp = s.speedUp
     }
 
-    /// Forget turn speed and haptic timing (new slot / screen / Set), so the
-    /// next crown tick is a slow, single-step one.
-    func resetMotion() {
-        speed = 0
-        lastEvent = 0
-    }
+    /// Forget carry and turn speed (new slot / screen / Set).
+    func resetMotion() { mapper.reset() }
 
-    /// ms per crown unit for a given turn speed (units/s). With
-    /// acceleration off it is always the base step.
-    private func step(forSpeed v: Double) -> Int {
-        guard speedUp else { return baseStep }
-        let tier: Int
-        if v < 25 { tier = 1 }          // deliberate: one detent = base step
-        else if v < 60 { tier = 10 }    // normal turn: tens of ms
-        else if v < 130 { tier = 100 }
-        else { tier = 1000 }            // fast spin: seconds
-        return max(baseStep, tier)
-    }
-
-    /// Crown step: `units` crown units (1 unit = 1 detent-ish). Speed is the
-    /// smoothed units/s over recent events (a pause > 0.3 s restarts at slow),
-    /// mapped to a ms-per-unit tier. One haptic when the value crosses a
-    /// multiple of the feedback interval (see hysteresis below). No allocations.
-    func addCrown(_ units: Int) {
-        guard units != 0 else { return }
-        let now = ProcessInfo.processInfo.systemUptime
-        let dt = now - lastEvent
-        if lastEvent == 0 || dt > 0.3 {
-            speed = 0
-        } else {
-            let inst = Double(abs(units)) / max(dt, 0.01)
-            speed = speed == 0 ? inst : speed * 0.5 + inst * 0.5
-        }
-        lastEvent = now
-        let ms = units * step(forSpeed: speed)
+    /// Crown event: `delta` = change of the crown binding (fractional).
+    /// Mapping lives in `Ao5CrownMapper`. One `.click` per event that moves
+    /// the value across a detent boundary (multi-boundary jumps coalesce);
+    /// hysteresis of interval/4 on reversal; no click when clamped.
+    func addCrown(_ delta: Double) {
+        let ms = mapper.millis(forDelta: delta, now: ProcessInfo.processInfo.systemUptime)
+        guard ms != 0 else { return }
         let old = millis
         apply(millis: millis + ms, penalty: penalty)
-        guard feedback, old != millis else { return }   // clamped = no click
-        // One click per event that moves the value across a detent boundary
-        // (multi-boundary jumps coalesce into one). Hysteresis: reversing
-        // must go a quarter interval past the boundary, so wobbling on a
-        // boundary does not chatter.
+        guard feedback, old != millis else { return }
         let idx = millis / interval
         let margin = interval / 4
         if idx > hapticIdx || (idx < hapticIdx && millis + margin < hapticIdx * interval) {
@@ -114,7 +81,7 @@ private struct Ao5DialTime: View {
     @State private var recentring = false
     @FocusState private var focused: Bool
 
-    private static let crownMid = 500_000.0
+    private static let crownMid = 1_000.0
 
     var body: some View {
         let dnf = dial.penalty == .dnf
@@ -131,12 +98,12 @@ private struct Ao5DialTime: View {
             }
             .focusable()
             .focused($focused)
-            .digitalCrownRotation($crown, from: 0, through: Self.crownMid * 2, by: 1,
+            .digitalCrownRotation($crown, from: 0, through: Self.crownMid * 2, by: 0.001,
                                   sensitivity: .medium, isContinuous: false,
                                   isHapticFeedbackEnabled: false)
             .onChange(of: crown) { old, new in
                 if recentring { recentring = false; return }
-                let d = Int((new - old).rounded())
+                let d = new - old
                 guard d != 0 else { return }
                 dial.addCrown(d)
                 // Keep well away from the crown range ends (fast spins).
