@@ -37,6 +37,7 @@ final class Ao5Dial {
     // Crown settings, loaded via `configure` (not per tick).
     private var feedback = Ao5Settings.defaultFeedback
     private var interval = Ao5Settings.defaultInterval
+    private var hapticIdx = 0            // detent index (millis / interval) last clicked/synced
     private var mapper = Ao5CrownMapper()
 
     func configure(_ s: Ao5Settings.Snapshot) {
