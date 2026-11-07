@@ -31,6 +31,7 @@ struct ContentView: View {
     @State private var openPuzzle: Puzzle?
     @State private var showAbout = false
     @State private var showTimer = false
+    @State private var showAo5 = false
     // Timer solve times; outlive the card being closed and are restored from
     // UserDefaults when the app is relaunched.
     @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
@@ -47,7 +48,7 @@ struct ContentView: View {
     private func close() {
         hideTask?.cancel()
         showClose = false
-        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false }
+        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAo5 = false }
     }
 
     private func scheduleHide() {
@@ -79,6 +80,8 @@ struct ContentView: View {
                                      set: { pages[open] = $0 }))
         } else if showTimer {
             TimerScreen(solves: $timerSolves)
+        } else if showAo5 {
+            NavigationStack { Ao5Screen() }
         } else {
             AboutView()
         }
@@ -117,16 +120,18 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if openPuzzle != nil || showAbout || showTimer {
+            if openPuzzle != nil || showAbout || showTimer || showAo5 {
                 openContent
                     .background(
                         // The tapped card grows into this tinted full-screen panel.
                         RoundedRectangle(cornerRadius: 18)
                             .fill((openPuzzle?.cardColor
-                                   ?? (showTimer ? TimerCard.color : AboutCard.color))
+                                   ?? (showTimer ? TimerCard.color
+                                       : showAo5 ? Ao5Card.color : AboutCard.color))
                                 .opacity(0.35))
                             .matchedGeometryEffect(id: openPuzzle?.rawValue
-                                                   ?? (showTimer ? TimerCard.id : AboutCard.id),
+                                                   ?? (showTimer ? TimerCard.id
+                                                       : showAo5 ? Ao5Card.id : AboutCard.id),
                                                    in: cardSpace)
                             .ignoresSafeArea()
                     )
@@ -158,6 +163,8 @@ struct ContentView: View {
                     withAnimation(Self.spring) { showAbout = true }
                 }, onTimer: {
                     withAnimation(Self.spring) { showTimer = true }
+                }, onAo5: {
+                    withAnimation(Self.spring) { showAo5 = true }
                 })
                 .transition(.opacity)
             }
@@ -168,6 +175,7 @@ struct ContentView: View {
         .onOpenURL { url in
             guard let target = ComplicationTarget(deepLink: url) else { return }
             showAbout = false
+            showAo5 = false
             if let target = target.puzzle {
                 puzzle = target
                 showTimer = false
@@ -192,6 +200,7 @@ private struct CardStack: View {
     let onPick: (Puzzle) -> Void
     let onAbout: () -> Void
     let onTimer: () -> Void
+    let onAo5: () -> Void
 
     private let cardHeight: CGFloat = 84
     private let frontCardHeight: CGFloat = 104
@@ -304,6 +313,51 @@ private struct CardStack: View {
         .accessibilityLabel("Timer")
     }
 
+    private var ao5Card: some View {
+        Button(action: onAo5) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ao5")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Average of 5")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "5.square")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [Ao5Card.color, Ao5Card.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: Ao5Card.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Ao5, average of 5")
+    }
+
     var body: some View {
         // Crown / touch scrolls the stack. Cards are laid out vertically with
         // real spacing (no overlap, every title and picture stays visible);
@@ -311,7 +365,7 @@ private struct CardStack: View {
         // nears the top or bottom edge.
         ScrollView {
             VStack(spacing: gap) {
-                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, About
+                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, Ao5, About
                 // (last, smallest and quietest).
                 ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
                     Button {
@@ -361,6 +415,7 @@ private struct CardStack: View {
                     .accessibilityLabel("\(option.name) scramble")
                 }
                 timerCard
+                ao5Card
                 aboutCard
             }
             .padding(.horizontal, 4)

@@ -1,8 +1,14 @@
 import SwiftUI
 import WatchKit
 
+/// Card identity (matched-geometry id and tint) for the card stack.
+enum Ao5Card {
+    static let id = "ao5"
+    static let color = Color(red: 0.55, green: 0.25, blue: 0.80)
+}
+
 /// Average-of-5 calculator: type five competition times, get the WCA Ao5.
-/// Reached from the Timer card (toolbar button on the idle and result screens).
+/// Its own top-level card in the card stack (`Ao5Card`).
 /// Times are typed like a stopwatch: digits shift in from the right, so 1 2 3 4
 /// reads 12.34 and 1 0 2 3 4 reads 1:02.34. Per solve: +2 and DNF toggles.
 /// Nothing is saved; leaving the screen discards the entries.
@@ -216,6 +222,6 @@ struct Ao5Screen: View {
                 resultView(all)
             }
         }
-        .navigationTitle("Ao5")
+        .modifier(CloseAwareTitle(title: "Ao5"))
     }
 }

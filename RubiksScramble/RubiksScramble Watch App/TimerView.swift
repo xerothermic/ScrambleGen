@@ -370,15 +370,6 @@ struct TimerScreen: View {
             }
             .buttonStyle(.plain)
             .padding(.top, 2)
-            // Visible entry to the Average-of-5 calculator (the toolbar icon
-            // alone was easy to miss).
-            NavigationLink(destination: Ao5Screen()) {
-                Label("Ao5 calculator", systemImage: "5.square")
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(minWidth: 110, minHeight: 28)
-                    .background(Capsule().fill(Color.white.opacity(0.18)))
-            }
-            .buttonStyle(.plain)
             // Wrist Flick drops the app back to the clock mid-solve.
             Text("Tip: for solving, turn off Settings > Gestures > Wrist Flick.")
                 .font(.system(size: 9))
@@ -529,17 +520,6 @@ struct TimerScreen: View {
                 }
             }
             .modifier(CloseAwareTitle(title: "Timer"))
-            // Average-of-5 calculator (not offered mid-run).
-            .toolbar {
-                if phase == .idle || phase == .done {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink(destination: Ao5Screen()) {
-                            Image(systemName: "5.square")
-                        }
-                        .accessibilityLabel("Average of 5")
-                    }
-                }
-            }
         }
         .onChange(of: phase) { old, new in
             timerLog.info("phase \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public)")
