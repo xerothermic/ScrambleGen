@@ -33,6 +33,7 @@ struct ContentView: View {
     @State private var showTimer = false
     @State private var showAo5 = false
     @State private var showCustom = false
+    @State private var showCalibrate = false   // TEMPORARY Calibrate card
     // Timer solve times; outlive the card being closed and are restored from
     // UserDefaults when the app is relaunched.
     @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
@@ -49,7 +50,7 @@ struct ContentView: View {
     private func close() {
         hideTask?.cancel()
         showClose = false
-        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAo5 = false; showCustom = false }
+        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAo5 = false; showCustom = false; showCalibrate = false }
     }
 
     private func scheduleHide() {
@@ -83,6 +84,8 @@ struct ContentView: View {
             TimerScreen(solves: $timerSolves)
         } else if showAo5 {
             NavigationStack { Ao5Screen() }
+        } else if showCalibrate {
+            NavigationStack { CalibrateScreen() }
         } else if showCustom {
             NavigationStack { CustomizationScreen() }
         } else {
@@ -123,7 +126,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if openPuzzle != nil || showAbout || showTimer || showAo5 || showCustom {
+            if openPuzzle != nil || showAbout || showTimer || showAo5 || showCustom || showCalibrate {
                 openContent
                     .background(
                         // The tapped card grows into this tinted full-screen panel.
@@ -131,11 +134,13 @@ struct ContentView: View {
                             .fill((openPuzzle?.cardColor
                                    ?? (showTimer ? TimerCard.color
                                        : showAo5 ? Ao5Card.color
+                                       : showCalibrate ? CalibrateCard.color
                                        : showCustom ? CustomizationCard.color : AboutCard.color))
                                 .opacity(0.35))
                             .matchedGeometryEffect(id: openPuzzle?.rawValue
                                                    ?? (showTimer ? TimerCard.id
                                                        : showAo5 ? Ao5Card.id
+                                                       : showCalibrate ? CalibrateCard.id
                                                        : showCustom ? CustomizationCard.id : AboutCard.id),
                                                    in: cardSpace)
                             .ignoresSafeArea()
@@ -170,6 +175,8 @@ struct ContentView: View {
                     withAnimation(Self.spring) { showTimer = true }
                 }, onAo5: {
                     withAnimation(Self.spring) { showAo5 = true }
+                }, onCalibrate: {
+                    withAnimation(Self.spring) { showCalibrate = true }
                 }, onCustomize: {
                     withAnimation(Self.spring) { showCustom = true }
                 })
@@ -184,6 +191,7 @@ struct ContentView: View {
             showAbout = false
             showAo5 = false
             showCustom = false
+            showCalibrate = false
             if let target = target.puzzle {
                 puzzle = target
                 showTimer = false
@@ -209,6 +217,7 @@ private struct CardStack: View {
     let onAbout: () -> Void
     let onTimer: () -> Void
     let onAo5: () -> Void
+    let onCalibrate: () -> Void
     let onCustomize: () -> Void
 
     private let cardHeight: CGFloat = 84
@@ -367,6 +376,51 @@ private struct CardStack: View {
         .accessibilityLabel("Ao5, average of 5")
     }
 
+    private var calibrateCard: some View {
+        Button(action: onCalibrate) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Calibrate")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Temporary")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "scope")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [CalibrateCard.color, CalibrateCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: CalibrateCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Calibrate, temporary crown measurement")
+    }
+
     private var customizeCard: some View {
         Button(action: onCustomize) {
             HStack(alignment: .top) {
@@ -470,6 +524,7 @@ private struct CardStack: View {
                 }
                 timerCard
                 ao5Card
+                calibrateCard
                 customizeCard
                 aboutCard
             }
