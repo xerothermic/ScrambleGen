@@ -127,6 +127,10 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
         case .normal: return (25, 60, 130)
         }
     }
+    /// Thresholds actually applied: preset, or the user's values for Custom; nil for Off.
+    func resolvedThresholds(custom: (Double, Double, Double)) -> (Double, Double, Double)? {
+        self == .custom ? custom : thresholds
+    }
 }
 
 /// Digital Crown delta -> steps (the Ao5 dial treats one step as one centisecond). Pure (time is passed in) so it is
@@ -156,7 +160,7 @@ struct Ao5CrownMapper {
     /// ms per detent for a turn speed. Slow = base step, never suppressed.
     static func step(forSpeed v: Double, base: Int, accel: Ao5Accel,
                      custom: (Double, Double, Double) = (25, 60, 130)) -> Int {
-        guard let t = accel == .custom ? custom : accel.thresholds else { return base }
+        guard let t = accel.resolvedThresholds(custom: custom) else { return base }
         let tier: Int
         if v < t.0 { tier = 1 }
         else if v < t.1 { tier = 10 }

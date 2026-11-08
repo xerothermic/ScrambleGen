@@ -100,6 +100,10 @@ for u in (100, 524, 1500):                  # units per revolution setting
 c = (10, 20, 30)
 assert [tier(v, 1, 'custom', c) for v in (5, 15, 25, 35)] == [1, 10, 100, 1000]
 m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 3000
+# resolved thresholds: Custom uses user values, presets ignore them, Off is None
+res = lambda a, c: c if a == 'custom' else TH[a]
+assert res('off', (7, 8, 9)) is None and res('custom', (7, 8, 9)) == (7, 8, 9)
+assert res('normal', (7, 8, 9)) == (25, 60, 130) and res('gentle', (7, 8, 9))[2] == 260
 # display + digit entry (mirrors AverageOfFive.format / millis(fromDigits:))
 def fmt(ms):
     t = max(0, ms) // 10

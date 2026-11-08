@@ -142,6 +142,35 @@ private func sectionHeader(_ title: String) -> some View {
     Text(title).font(.system(size: 10, weight: .semibold)).textCase(nil)
 }
 
+/// Acceleration choice list: whole row is a plain button; sets the value and dismisses.
+struct Ao5AccelPicker: View {
+    @Binding var selection: Int
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            ForEach(Ao5Accel.allCases) { mode in
+                Button {
+                    selection = mode.rawValue
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(mode.title).font(.system(size: 14))
+                        Spacer()
+                        if selection == mode.rawValue {
+                            Image(systemName: "checkmark").foregroundStyle(.tint)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .navigationTitle("Acceleration")
+    }
+}
+
 /// Settings screen: one Section per feature, so adding a feature = adding a
 /// Section here (and its keys above).
 struct CustomizationScreen: View {
@@ -163,10 +192,8 @@ struct CustomizationScreen: View {
                 TuneRow("Crown speed", value: $step, range: Ao5Settings.stepRange, step: 1)
                 TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
                 TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
-                Button {
-                    let all = Ao5Accel.allCases
-                    let cur = all.firstIndex { $0.rawValue == accel } ?? 0
-                    accel = all[(cur + 1) % all.count].rawValue
+                NavigationLink {
+                    Ao5AccelPicker(selection: $accel)
                 } label: {
                     HStack {
                         Text("Acceleration").font(.system(size: 11))
