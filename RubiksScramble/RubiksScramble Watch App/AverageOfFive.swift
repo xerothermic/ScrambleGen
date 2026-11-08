@@ -100,18 +100,41 @@ enum AverageOfFive {
     }
 }
 
+/// Fast-spin acceleration level: detents/s thresholds for the 10 ms, 100 ms
+/// and 1 s tiers. Raw value is persisted.
+enum Ao5Accel: Int, CaseIterable, Identifiable {
+    case off = 0, gentle = 1, normal = 2
+    var id: Int { rawValue }
+    var title: String {
+        switch self {
+        case .off: return "Off"
+        case .gentle: return "Gentle"
+        case .normal: return "Normal"
+        }
+    }
+    var thresholds: (Double, Double, Double)? {
+        switch self {
+        case .off: return nil
+        case .gentle: return (50, 120, 260)
+        case .normal: return (25, 60, 130)
+        }
+    }
+}
+
 /// Digital Crown delta -> milliseconds. Pure (time is passed in) so it is
 /// unit-testable. The crown binding is a Double whose unit is roughly one
-/// revolution; `detentsPerUnit` turns that into detents (default ~150 per
-/// revolution, i.e. ~2.4 degrees each). Fractional detents are CARRIED, never
+/// revolution (Apple's XCUI `rotateDigitalCrown(delta:)` calls 1.0 a full
+/// rotation); `stepsPerRev` turns that into detents (default 150, ~2.4
+/// degrees each). Fractional detents are CARRIED, never
 /// truncated, so slow turns always add up; every whole detent is worth at
 /// least the base step (>= 1 ms). Speed (detents/s, smoothed, restarting
 /// after a 0.3 s pause) only raises the step when acceleration is on.
 struct Ao5CrownMapper {
-    static let detentsPerUnit = 150.0
+    static let defaultStepsPerRev = 150
+    var stepsPerRev = defaultStepsPerRev
 
     var baseStep = 1
-    var speedUp = true
+    var accel = Ao5Accel.gentle
     private(set) var carry = 0.0           // fractional detents not yet applied
     private var speed = 0.0                // smoothed detents per second
     private var lastTime: Double?
@@ -119,12 +142,12 @@ struct Ao5CrownMapper {
     mutating func reset() { carry = 0; speed = 0; lastTime = nil }
 
     /// ms per detent for a turn speed. Slow = base step, never suppressed.
-    static func step(forSpeed v: Double, base: Int, speedUp: Bool) -> Int {
-        guard speedUp else { return base }
+    static func step(forSpeed v: Double, base: Int, accel: Ao5Accel) -> Int {
+        guard let t = accel.thresholds else { return base }
         let tier: Int
-        if v < 25 { tier = 1 }
-        else if v < 60 { tier = 10 }
-        else if v < 130 { tier = 100 }
+        if v < t.0 { tier = 1 }
+        else if v < t.1 { tier = 10 }
+        else if v < t.2 { tier = 100 }
         else { tier = 1000 }
         return max(base, tier)
     }
@@ -133,7 +156,7 @@ struct Ao5CrownMapper {
     /// including tiny fractions); `now` = monotonic seconds. Returns signed ms.
     mutating func millis(forDelta delta: Double, now: Double) -> Int {
         guard delta != 0 else { return 0 }
-        var detents = delta * Self.detentsPerUnit
+        var detents = delta * Double(max(1, stepsPerRev))
         if (detents > 0 && carry < 0) || (detents < 0 && carry > 0) { carry = 0 }   // reversal
         if let t = lastTime, now - t <= 0.3 {
             let inst = abs(detents) / max(now - t, 0.01)
@@ -145,6 +168,6 @@ struct Ao5CrownMapper {
         detents += carry
         let whole = detents.rounded(.towardZero)
         carry = detents - whole
-        return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), speedUp: speedUp)
+        return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), accel: accel)
     }
 }

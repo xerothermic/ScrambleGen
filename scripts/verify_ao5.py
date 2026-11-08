@@ -46,16 +46,18 @@ assert compute([(1, "none"), (333, "none"), (333, "none"), (335, "none"), (9999,
 
 # --- crown mapper mirror (Ao5CrownMapper) ---
 DPU = 150.0
-def tier(v, base, speed_up):
-    if not speed_up: return base
-    t = 1 if v < 25 else 10 if v < 60 else 100 if v < 130 else 1000
+TH = {'off': None, 'gentle': (50, 120, 260), 'normal': (25, 60, 130)}
+def tier(v, base, accel):
+    th = TH[accel]
+    if th is None: return base
+    t = 1 if v < th[0] else 10 if v < th[1] else 100 if v < th[2] else 1000
     return max(base, t)
 
 class Mapper:
-    def __init__(s, base=1, speed_up=True): s.base, s.up, s.carry, s.speed, s.t = base, speed_up, 0.0, 0.0, None
+    def __init__(s, base=1, accel='normal', spr=150): s.base, s.up, s.spr, s.carry, s.speed, s.t = base, accel, spr, 0.0, 0.0, None
     def feed(s, delta, now):
         if delta == 0: return 0
-        d = delta * DPU
+        d = delta * s.spr
         if (d > 0 and s.carry < 0) or (d < 0 and s.carry > 0): s.carry = 0.0
         if s.t is not None and now - s.t <= 0.3:
             inst = abs(d) / max(now - s.t, 0.01)
@@ -82,6 +84,10 @@ for _ in range(2000):   # slow one-direction turn: sum of ms == detents moved (+
         t += 1.0; dlt = random.random() * 0.01
         units += dlt; tot += m.feed(dlt, t)
     assert abs(tot - units * DPU) < 1.0 + 1e-6
+for n in (30, 100, 150, 1000):
+    assert Mapper(spr=n).feed(1.0, 1) == n
+    m = Mapper(spr=n); assert sum(m.feed(1.0 / (8 * n), 10 + i) for i in range(8)) == 1
+assert tier(40, 1, 'gentle') == 1 and tier(40, 1, 'normal') == 10 and tier(300, 1, 'gentle') == 1000
 # clamping (mirrors Ao5Dial.apply)
 MAXMS = 59 * 60000 + 59999
 clamp = lambda v: min(max(v, 0), MAXMS)

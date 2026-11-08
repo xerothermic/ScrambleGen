@@ -45,7 +45,8 @@ final class Ao5Dial {
         interval = max(1, s.interval)
         hapticIdx = millis / interval
         mapper.baseStep = max(1, s.step)
-        mapper.speedUp = s.speedUp
+        mapper.accel = s.accel
+        mapper.stepsPerRev = s.stepsPerRev
     }
 
     /// Forget carry and turn speed (new slot / screen / Set).
