@@ -110,7 +110,10 @@ final class AverageOfFiveTests: XCTestCase {
         XCTAssertEqual(AverageOfFive.millis(fromDigits: "102345"), 62345)    // 1:02.345
         XCTAssertEqual(AverageOfFive.millis(fromDigits: "75999"), 75999)     // 75.999 s
         XCTAssertEqual(AverageOfFive.millis(fromDigits: "175999"), 135999)   // 1:75.999 = 2:15.999
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "1234567"), 754567)  // 12:34.567
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "1234567"), 600_000) // 12:34.567 clamps to 10:00.000
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "1000000"), 600_000)
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "95999"), 95999)
+        XCTAssertEqual(AverageOfFive.maxMillis, 600_000)
     }
 
     // MARK: Crown mapping

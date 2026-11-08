@@ -89,14 +89,19 @@ enum AverageOfFive {
 
     /// Milliseconds from typed digits, entered right to left like a stopwatch
     /// ("12345" = 12.345, "102345" = 1:02.345). Seconds above 59 carry into
-    /// minutes ("75999" = 75.999 s = 1:15.999). Non-digits are ignored.
+    /// minutes ("75999" = 75.999 s = 1:15.999). Clamped to `maxMillis` (10:00.000).
+    /// Non-digits are ignored.
+    /// Longest time the Ao5 calculator accepts: 10:00.000. Everything entered or
+    /// dialled is clamped to this.
+    static let maxMillis = 600_000
+
     static func millis(fromDigits digits: String) -> Int {
         let ds = digits.filter { $0 >= "0" && $0 <= "9" }.suffix(7)
         guard let value = Int(ds) else { return 0 }
         let ms = value % 1000
         let rest = value / 1000
         let seconds = rest % 100 + (rest / 100) * 60
-        return seconds * 1000 + ms
+        return min(seconds * 1000 + ms, maxMillis)
     }
 }
 

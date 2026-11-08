@@ -17,7 +17,7 @@ final class Ao5Dial {
     /// Stored (not computed) so the Set button only re-renders when it flips.
     private(set) var canSet = false
 
-    static let maxMillis = 59 * 60_000 + 59_999   // 59:59.999
+    static let maxMillis = AverageOfFive.maxMillis   // 10:00.000
 
     /// Programmatic change (slot select, Set, New, +2/DNF): never clicks, and
     /// re-anchors the haptic detent to the new value.

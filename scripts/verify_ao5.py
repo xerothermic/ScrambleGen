@@ -100,7 +100,8 @@ c = (10, 20, 30)
 assert [tier(v, 1, 'custom', c) for v in (5, 15, 25, 35)] == [1, 10, 100, 1000]
 m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 3000
 # clamping (mirrors Ao5Dial.apply)
-MAXMS = 59 * 60000 + 59999
+MAXMS = 10 * 60000   # 10:00.000
 clamp = lambda v: min(max(v, 0), MAXMS)
-assert clamp(-5) == 0 and clamp(MAXMS + 1000) == MAXMS
+assert clamp(-5) == 0 and clamp(MAXMS + 1000) == MAXMS and clamp(599_999) == 599_999
+assert MAXMS == 600_000
 print("ok")

@@ -108,30 +108,38 @@ struct TuneRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.caption2)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
             HStack(spacing: 4) {
                 Button { value = max(range.lowerBound, value - step) } label: {
-                    Image(systemName: "minus")
+                    Image(systemName: "minus").font(.system(size: 10, weight: .semibold))
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.mini)
                 .disabled(value <= range.lowerBound)
                 Text(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
-                    .font(.caption.monospacedDigit())
+                    .font(.system(size: 12).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .frame(maxWidth: .infinity)
                 Button { value = min(range.upperBound, value + step) } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.mini)
                 .disabled(value >= range.upperBound)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 0)
+        .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
     }
+}
+
+/// Small section header (the default watchOS header font is large).
+private func sectionHeader(_ title: String) -> some View {
+    Text(title).font(.system(size: 10, weight: .semibold)).textCase(nil)
 }
 
 /// Settings screen: one Section per feature, so adding a feature = adding a
@@ -151,7 +159,7 @@ struct CustomizationScreen: View {
 
     var body: some View {
         Form {
-            Section("Ao5") {
+            Section {
                 TuneRow("Crown speed", unit: "ms", value: $step, range: Ao5Settings.stepRange, step: 1)
                 TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
                 TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
@@ -160,14 +168,17 @@ struct CustomizationScreen: View {
                         Text(a.title).tag(a.rawValue)
                     }
                 } label: {
-                    Text("Acceleration").font(.caption)
+                    Text("Acceleration").font(.system(size: 11))
                 }
+                .font(.system(size: 11))
+                .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                 if accel == Ao5Accel.custom.rawValue {
                     TuneRow("10 ms from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
                     TuneRow("100 ms from", unit: "/s", value: $accel2, range: Ao5Settings.accelRange, step: 1)
                     TuneRow("1 s from", unit: "/s", value: $accel3, range: Ao5Settings.accelRange, step: 1)
                 }
-                Toggle(isOn: $feedback) { Text("Crown feedback").font(.caption) }
+                Toggle(isOn: $feedback) { Text("Crown feedback").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                 if feedback {
                     TuneRow("Feedback every", unit: "ms", value: $interval, range: Ao5Settings.intervalRange, step: 1)
                 }
@@ -183,13 +194,21 @@ struct CustomizationScreen: View {
                     accel2 = Ao5Settings.defaultAccel2
                     accel3 = Ao5Settings.defaultAccel3
                 } label: {
-                    Text("Reset to defaults").font(.caption)
+                    Text("Reset to defaults").font(.system(size: 11))
                 }
+                .controlSize(.mini)
+                .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+            } header: {
+                sectionHeader("Ao5")
             }
-            Section("Developer") {
-                Toggle(isOn: $debug) { Text("Debug mode").font(.caption) }
+            Section {
+                Toggle(isOn: $debug) { Text("Debug mode").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+            } header: {
+                sectionHeader("Developer")
             }
         }
+        .font(.system(size: 11))
         .navigationTitle("Customization")
     }
 }

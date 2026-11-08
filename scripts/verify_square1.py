@@ -8,6 +8,8 @@ and must stay legal there too: a turn must leave boundaries on both slice
 lines (0 and 6) of both layers, and the pieces must always tile 12 cells
 with 8 two-cell corners and 8 one-cell edges between them.
 
+Also checks that the shape is cube shape after each of the first six slices.
+
 Also checks the token format the watch UI relies on: one token per slice,
 no token wider than 8 characters, and a (0,0) turn only as the opening
 bare "/".
@@ -40,18 +42,46 @@ def slice_(joined):
         joined[6 + i], joined[12 + i] = joined[12 + i], joined[6 + i]
 
 
-def generate(slices, rng):
+def is_cube(joined):
+    for layer in (joined[:12], joined[12:]):
+        starts = [i for i in range(12) if not layer[(i - 1) % 12]]
+        widths = [((starts[(k + 1) % len(starts)] - s) % 12) or 12 for k, s in enumerate(starts)]
+        if widths.count(2) != 4 or any(widths[k] == widths[(k + 1) % len(widths)]
+                                       for k in range(len(widths))):
+            return False
+    return True
+
+
+CUBE_SHAPE_SLICES = 6
+
+
+def generate(slices, rng, shapes=None):
     joined = SOLVED[:]
     tokens = []
     while len(tokens) < max(0, slices):
-        top, bottom = rng.randint(-5, 6), rng.randint(-5, 6)
+        if len(tokens) < CUBE_SHAPE_SLICES:
+            options = []
+            for t in range(-5, 7):
+                for b in range(-5, 7):
+                    if (t or b or not tokens):
+                        trial = joined[:]
+                        if turn(trial, t, b):
+                            slice_(trial)
+                            if is_cube(trial):
+                                options.append((t, b))
+            top, bottom = rng.choice(options)
+        else:
+            top, bottom = rng.randint(-5, 6), rng.randint(-5, 6)
+            if not (top or bottom):
+                continue
+            if not turn(joined[:], top, bottom):
+                continue
         is_turn = top != 0 or bottom != 0
-        if not (is_turn or not tokens):
-            continue
-        if not turn(joined, top, bottom):
-            continue
+        assert turn(joined, top, bottom)
         slice_(joined)
         tokens.append(f"({top},{bottom})/" if is_turn else "/")
+        if len(tokens) <= CUBE_SHAPE_SLICES:
+            assert is_cube(joined), f"slice {len(tokens)} left cube shape: {tokens}"
     return tokens
 
 
@@ -121,6 +151,22 @@ for slices in list(range(0, 31)) * 700:
     assert len(tokens) == slices, (slices, len(tokens))
     replay(tokens)
     runs += 1
+
+# first six slices stay in cube shape; later ones eventually leave it
+left = 0
+for _ in range(500):
+    j = SOLVED[:]
+    toks = generate(15, rng)
+    for k, tok in enumerate(toks):
+        m = TOKEN.match(tok)
+        x, y = (int(m.group(1)), int(m.group(2))) if m.group(1) else (0, 0)
+        assert turn(j, x, y); slice_(j)
+        if k < 6:
+            assert is_cube(j)
+        elif not is_cube(j):
+            left += 1
+            break
+assert left > 100, f"scrambles never leave cube shape after slice 6 ({left})"
 
 sample = generate(15, random.Random(7))
 print(f"verified {runs} scrambles (0-30 slices); sample: {' '.join(sample)}")
