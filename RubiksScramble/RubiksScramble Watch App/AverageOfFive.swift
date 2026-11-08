@@ -129,8 +129,8 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
     var threshold: Double? {
         switch self {
         case .off, .custom: return nil
-        case .gentle: return 50
-        case .normal: return 25
+        case .gentle: return 300   // ~2 rev/s (150 detents = 1 rev)
+        case .normal: return 180   // ~1.2 rev/s
         }
     }
     /// Threshold actually applied: preset, or the user's value for Custom; nil for Off.
@@ -145,29 +145,38 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
 /// units. `stepsPerRev` turns that into detents (default 150, ~2.4
 /// degrees each): detents = delta / unitsPerRev * stepsPerRev. Fractional detents are CARRIED, never
 /// truncated, so slow turns always add up; every whole detent is worth at
-/// least the base step (>= 1 ms). Speed (detents/s, smoothed, restarting
-/// after a 0.3 s pause) only raises the step when acceleration is on.
+/// least the base step (>= 1 ms). Speed (detents/s, lightly smoothed, restarting
+/// after a 0.12 s pause) only raises the step when acceleration is on. x10 starts
+/// at the threshold T and ends below `hysteresis` * T (0.6), so it drops back to
+/// x1 as soon as the user slows down.
 struct Ao5CrownMapper {
     static let defaultStepsPerRev = 150
+    static let defaultCustomThreshold = 300.0   // detents/s
+    static let hysteresis = 0.6                 // leave x10 below hysteresis * threshold
+    static let gapReset = 0.12                  // s; a longer gap between events restarts speed
+    static let smoothing = 0.7                  // weight of the newest speed sample
     static let defaultUnitsPerRev = 524.0   // crown binding units per physical revolution (measured 524.24)
     var unitsPerRev = defaultUnitsPerRev
     var stepsPerRev = defaultStepsPerRev
     /// x10 threshold (detents/s) in Custom mode.
-    var customThreshold = 25.0
+    var customThreshold = defaultCustomThreshold
 
     var baseStep = 1
     var accel = Ao5Accel.gentle
     private(set) var carry = 0.0           // fractional detents not yet applied
     private var speed = 0.0                // smoothed detents per second
     private var lastTime: Double?
+    private var fast = false               // x10 currently engaged (hysteresis state)
 
-    mutating func reset() { carry = 0; speed = 0; lastTime = nil }
+    mutating func reset() { carry = 0; speed = 0; lastTime = nil; fast = false }
 
     /// ms per detent for a turn speed. Slow = base step, never suppressed.
+    /// `wasFast`: x10 was already engaged, so it is kept until speed < 0.6 * threshold.
     static func step(forSpeed v: Double, base: Int, accel: Ao5Accel,
-                     custom: Double = 25) -> Int {
+                     custom: Double = defaultCustomThreshold, wasFast: Bool = false) -> Int {
         guard let t = accel.resolvedThreshold(custom: custom) else { return base }
-        return max(base, v < t ? 1 : 10)
+        let limit = wasFast ? t * hysteresis : t
+        return max(base, v < limit ? 1 : 10)
     }
 
     /// `delta` = change of the crown binding since the last event (any size,
@@ -176,18 +185,21 @@ struct Ao5CrownMapper {
         guard delta != 0 else { return 0 }
         var detents = delta / max(1, unitsPerRev) * Double(max(1, stepsPerRev))
         if (detents > 0 && carry < 0) || (detents < 0 && carry > 0) { carry = 0 }   // reversal
-        if let t = lastTime, now - t <= 0.3 {
+        if let t = lastTime, now - t <= Self.gapReset {
             let inst = abs(detents) / max(now - t, 0.01)
-            speed = speed == 0 ? inst : speed * 0.5 + inst * 0.5
+            speed = speed == 0 ? inst : speed * (1 - Self.smoothing) + inst * Self.smoothing
         } else {
             speed = 0
+            fast = false
         }
         lastTime = now
         detents += carry
         let whole = (detents + (detents < 0 ? -1e-9 : 1e-9)).rounded(.towardZero)   // absorb float dust (524 slow units must give exactly 150)
         carry = detents - whole
-        return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), accel: accel,
-                                         custom: customThreshold)
+        let step = Self.step(forSpeed: speed, base: max(1, baseStep), accel: accel,
+                             custom: customThreshold, wasFast: fast)
+        fast = accel != .off && step > max(1, baseStep)
+        return Int(whole) * step
     }
 }
 

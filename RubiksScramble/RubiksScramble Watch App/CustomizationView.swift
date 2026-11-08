@@ -24,7 +24,7 @@ enum Ao5Settings {
     static let accelKey = "ao5.accelLevel"
     static let stepsKey = "ao5.stepsPerRev"
     static let unitsKey = "ao5.unitsPerRev"
-    static let accel1Key = "ao5.accelT1"
+    static let accel1Key = "ao5.accelT1v2"   // v2: scale changed in build 86 (150 detents = 1 rev); old low values (25) ignored
 
     static let defaultFeedback = true
     static let defaultInterval = 1
@@ -32,13 +32,13 @@ enum Ao5Settings {
     static let defaultAccel = Ao5Accel.gentle.rawValue
     static let defaultSteps = Ao5CrownMapper.defaultStepsPerRev
     static let defaultUnits = Int(Ao5CrownMapper.defaultUnitsPerRev)
-    static let defaultAccel1 = 25
+    static let defaultAccel1 = Int(Ao5CrownMapper.defaultCustomThreshold)
 
     static let intervalRange = 1...100
     static let stepRange = 1...100
     static let stepsRange = 10...2000
     static let unitsRange = 100...1500
-    static let accelRange = 1...1000
+    static let accelRange = 10...2000
 
     struct Snapshot {
         var feedback = defaultFeedback
@@ -73,7 +73,7 @@ enum Ao5Settings {
     /// Removes every Ao5 key so all defaults apply.
     static func resetToDefaults() {
         let d = UserDefaults.standard
-        for k in ["ao5.feedbackInterval", "ao5.crownStep", feedbackKey, intervalKey, stepKey, accelKey, stepsKey, unitsKey,
+        for k in ["ao5.feedbackInterval", "ao5.crownStep", "ao5.accelT1", feedbackKey, intervalKey, stepKey, accelKey, stepsKey, unitsKey,
                   accel1Key, "ao5.accelT2", "ao5.accelT3"] {   // T2/T3: removed x100/x1000 tiers, cleaned up
             d.removeObject(forKey: k)
         }
@@ -194,7 +194,7 @@ struct CustomizationScreen: View {
                 TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
                 AccelRow(selection: $accel)
                 if accel == Ao5Accel.custom.rawValue {
-                    TuneRow("x10 from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
+                    TuneRow("x10 from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 10)
                 }
                 Toggle(isOn: $feedback) { Text("Crown feedback").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))

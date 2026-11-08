@@ -150,7 +150,7 @@ final class AverageOfFiveTests: XCTestCase {
 
     func testSpeedTiersAndBase() {
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 1, base: 1, accel: .normal), 1)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, accel: .normal), 10)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 200, base: 1, accel: .normal), 10)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 1, accel: .normal), 10)   // no x100/x1000 tiers
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 5, accel: .off), 5)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 1, base: 10, accel: .normal), 10)
@@ -158,9 +158,36 @@ final class AverageOfFiveTests: XCTestCase {
 
     func testFastSpinAccelerates() {
         var m = Ao5CrownMapper()
-        _ = m.millis(forDelta: 10.48, now: 1.00)
-        let ms = m.millis(forDelta: 10.48, now: 1.02)      // 3 detents / 20 ms = 150/s
-        XCTAssertEqual(ms, 30)
+        _ = m.millis(forDelta: 27.9, now: 1.00)
+        let ms = m.millis(forDelta: 27.9, now: 1.02)       // 8 detents / 20 ms = 400/s >= Gentle 300
+        XCTAssertEqual(ms, 80)
+    }
+
+    func testNormalSpinStaysX1() {
+        for mode in [Ao5Accel.gentle, .normal] {
+            var m = Ao5CrownMapper()
+            m.accel = mode
+            var total = 0
+            var t = 0.0
+            for _ in 0..<60 { t += 1.0 / 60; total += m.millis(forDelta: 524.0 / 60, now: t) }   // 1 rev/s = 150 detents/s
+            XCTAssertEqual(Double(total), 150, accuracy: 1)
+        }
+    }
+
+    func testHysteresisAndGapReset() {
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 120, base: 1, accel: .normal), 1)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 120, base: 1, accel: .normal, wasFast: true), 10)   // >= 0.6 * 180
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 100, base: 1, accel: .normal, wasFast: true), 1)
+        var m = Ao5CrownMapper()
+        m.accel = .normal
+        var t = 0.0
+        for _ in 0..<20 { t += 1.0 / 60; _ = m.millis(forDelta: 3 * 524.0 / 60, now: t) }   // 3 rev/s
+        var last = 0
+        for _ in 0..<6 { t += 1.0 / 60; last = m.millis(forDelta: 0.5 * 524.0 / 60, now: t) }   // slow to 0.5 rev/s
+        XCTAssertLessThanOrEqual(last, 1)                                                      // back to x1
+        for _ in 0..<20 { t += 1.0 / 60; _ = m.millis(forDelta: 3 * 524.0 / 60, now: t) }
+        t += 0.13                                                                               // gap > 0.12 s resets
+        XCTAssertEqual(m.millis(forDelta: 524.0 / 150, now: t), 1)
     }
 
     func testStepsPerRevolutionSetting() {
@@ -178,9 +205,10 @@ final class AverageOfFiveTests: XCTestCase {
     }
 
     func testGentleThresholdsAreHigher() {
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, accel: .gentle), 1)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, accel: .normal), 10)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 60, base: 1, accel: .gentle), 10)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 150, base: 1, accel: .gentle), 1)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 150, base: 1, accel: .normal), 1)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 200, base: 1, accel: .normal), 10)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 200, base: 1, accel: .gentle), 1)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 300, base: 1, accel: .gentle), 10)
     }
 
@@ -193,10 +221,11 @@ final class AverageOfFiveTests: XCTestCase {
     }
 
     func testCustomThresholds() {
-        let c = 10.0
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 5, base: 1, accel: .custom, custom: c), 1)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 15, base: 1, accel: .custom, custom: c), 10)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 35, base: 1, accel: .custom, custom: c), 10)
+        let c = 100.0
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 50, base: 1, accel: .custom, custom: c), 1)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 150, base: 1, accel: .custom, custom: c), 10)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 350, base: 1, accel: .custom, custom: c), 10)
+        XCTAssertEqual(Ao5CrownMapper().customThreshold, 300)
         var m = Ao5CrownMapper()
         m.accel = .custom
         m.customThreshold = c
@@ -211,8 +240,8 @@ final class AverageOfFiveTests: XCTestCase {
         XCTAssertEqual(Ao5Accel.gentle.cycled(by: 1), .normal)
         XCTAssertNil(Ao5Accel.off.resolvedThreshold(custom: c))
         XCTAssertEqual(Ao5Accel.custom.resolvedThreshold(custom: c), 7)
-        XCTAssertEqual(Ao5Accel.normal.resolvedThreshold(custom: c), 25)
-        XCTAssertEqual(Ao5Accel.gentle.resolvedThreshold(custom: c), 50)
+        XCTAssertEqual(Ao5Accel.normal.resolvedThreshold(custom: c), 180)
+        XCTAssertEqual(Ao5Accel.gentle.resolvedThreshold(custom: c), 300)
     }
 
     func testHapticClickOnDetentCrossing() {

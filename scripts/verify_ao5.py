@@ -48,30 +48,34 @@ assert compute([(0, "none"), (15, "none"), (15, "none"), (15, "none"), (50, "non
 # --- crown mapper mirror (Ao5CrownMapper) ---
 DEFAULT_UPR = UPR = 524.0                  # crown binding units per revolution (Ao5CrownMapper.unitsPerRev)
 DPU = 150.0
-TH = {'off': None, 'gentle': 50, 'normal': 25, 'custom': None}
-def tier(v, base, accel, custom=25):
+TH = {'off': None, 'gentle': 300, 'normal': 180, 'custom': None}
+HYST, GAP, SMOOTH = 0.6, 0.12, 0.7
+def tier(v, base, accel, custom=300, was_fast=False):
     th = custom if accel == 'custom' else TH[accel]
     if th is None: return base
-    t = 1 if v < th else 10
+    t = 1 if v < (th * HYST if was_fast else th) else 10
     return max(base, t)
 
 class Mapper:
-    def __init__(s, base=1, accel='normal', spr=150, upr=DEFAULT_UPR, custom=25):
+    def __init__(s, base=1, accel='gentle', spr=150, upr=DEFAULT_UPR, custom=300):
         s.base, s.up, s.spr, s.carry, s.speed, s.t, s.upr, s.custom = base, accel, spr, 0.0, 0.0, None, upr, custom
+        s.fast = False
     def feed(s, delta, now):
         if delta == 0: return 0
         d = delta / max(1, s.upr) * s.spr
         if (d > 0 and s.carry < 0) or (d < 0 and s.carry > 0): s.carry = 0.0
-        if s.t is not None and now - s.t <= 0.3:
+        if s.t is not None and now - s.t <= GAP:
             inst = abs(d) / max(now - s.t, 0.01)
-            s.speed = inst if s.speed == 0 else s.speed * 0.5 + inst * 0.5
+            s.speed = inst if s.speed == 0 else s.speed * (1 - SMOOTH) + inst * SMOOTH
         else:
-            s.speed = 0.0
+            s.speed = 0.0; s.fast = False
         s.t = now
         d += s.carry
         whole = int(d + (-1e-9 if d < 0 else 1e-9))  # toward zero, absorbing float dust
         s.carry = d - whole
-        return whole * tier(s.speed, max(1, s.base), s.up, s.custom)
+        st = tier(s.speed, max(1, s.base), s.up, s.custom, s.fast)
+        s.fast = s.up != 'off' and st > max(1, s.base)
+        return whole * st
 
 m = Mapper(); tot = 0; t = 0.0
 for _ in range(524):
@@ -83,7 +87,7 @@ for _ in range(7080):                        # smallest measured delta 0.074, ca
 assert tot == int(7080 * 0.074 / UPR * 150), tot
 m = Mapper(); assert m.feed(UPR / DPU, 1) == 1 and m.feed(-UPR / DPU, 5) == -1
 m = Mapper(); assert (m.feed(2.0, 1), m.feed(-2.0, 2), m.feed(-2.0, 3)) == (0, 0, -1)
-m = Mapper(); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 30
+m = Mapper(); m.feed(27.9, 1.00); assert m.feed(27.9, 1.02) == 80   # 8 detents/20 ms = 400/s >= 300
 random.seed(9)
 for _ in range(2000):   # slow one-direction turn: sum of ms == detents moved (+-1), no lost movement
     m = Mapper(); t = 0.0; units = 0.0; tot = 0
@@ -94,16 +98,37 @@ for _ in range(2000):   # slow one-direction turn: sum of ms == detents moved (+
 for n in (30, 100, 150, 1000):
     assert Mapper(spr=n).feed(UPR, 1) == n
     m = Mapper(spr=n); assert sum(m.feed(UPR / (8 * n), 10 + i) for i in range(8)) == 1
-assert tier(40, 1, 'gentle') == 1 and tier(40, 1, 'normal') == 10 and tier(300, 1, 'gentle') == 10 and tier(500, 1, 'normal') == 10
+assert tier(40, 1, 'gentle') == 1 and tier(150, 1, 'normal') == 1 and tier(150, 1, 'gentle') == 1
+assert tier(180, 1, 'normal') == 10 and tier(300, 1, 'gentle') == 10 and tier(500, 1, 'normal') == 10
+# hysteresis: stay x10 down to 0.6*T, then drop
+assert tier(120, 1, 'normal', was_fast=True) == 10 and tier(100, 1, 'normal', was_fast=True) == 1
+assert tier(500, 5, 'off') == 5 and tier(1, 10, 'normal') == 10
 for u in (100, 524, 1500):                  # units per revolution setting
     assert Mapper(upr=u).feed(u, 1) == 150
-c = 10
-assert [tier(v, 1, 'custom', c) for v in (5, 15, 25, 35)] == [1, 10, 10, 10]
-m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 30
+c = 100
+assert [tier(v, 1, 'custom', c) for v in (50, 99, 100, 350)] == [1, 1, 10, 10]
+m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 30   # 150/s >= 100
+# normal-speed spin (1 rev/s = 150 detents/s at 60 events/s) stays x1 in Gentle and Normal; 3 rev/s hits x10
+for acc in ('gentle', 'normal'):
+    m = Mapper(accel=acc); t = 0.0; tot = 0
+    for _ in range(60): t += 1/60; tot += m.feed(UPR / 60, t)
+    assert abs(tot - 150) <= 1, (acc, tot)
+m = Mapper(accel='gentle'); t = 0.0; tot = 0
+for _ in range(60): t += 1/60; tot += m.feed(3 * UPR / 60, t)
+assert tot > 450 * 5, tot
+# fast spin then slow down: x10 ends within a few events once speed < 0.6*T; a 0.12 s gap resets
+m = Mapper(accel='normal'); t = 0.0
+for _ in range(20): t += 1/60; m.feed(3 * UPR / 60, t)
+assert m.fast
+for _ in range(6): t += 1/60; r = m.feed(0.5 * UPR / 60, t)   # 0.5 rev/s
+assert r in (0, 1) and not m.fast, (r, m.fast)
+m = Mapper(accel='normal'); t = 0.0
+for _ in range(20): t += 1/60; m.feed(3 * UPR / 60, t)
+t += 0.13; assert m.feed(UPR / 150, t) == 1 and not m.fast
 # resolved thresholds: Custom uses user values, presets ignore them, Off is None
 res = lambda a, c: c if a == 'custom' else TH[a]
 assert res('off', 7) is None and res('custom', 7) == 7
-assert res('normal', 7) == 25 and res('gentle', 7) == 50
+assert res('normal', 7) == 180 and res('gentle', 7) == 300
 # display + digit entry (mirrors AverageOfFive.format / millis(fromDigits:))
 def fmt(ms):
     t = max(0, ms) // 10
