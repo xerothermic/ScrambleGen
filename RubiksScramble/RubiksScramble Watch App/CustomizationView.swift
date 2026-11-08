@@ -196,6 +196,7 @@ struct CustomizationScreen: View {
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
     @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
+    @AppStorage(ScrambleSource.randomStateKey) private var randomState = ScrambleSource.defaultRandomState
 
     var body: some View {
         Form {
@@ -205,6 +206,15 @@ struct CustomizationScreen: View {
                     .logTap("hint toggle")
             } header: {
                 sectionHeader("Scramble")
+            }
+            Section {
+                Toggle(isOn: $randomState) { Text("3x3 random-state").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .onChange(of: randomState) { _, on in
+                        if on { ScrambleSource.prewarm() }
+                    }
+            } header: {
+                sectionHeader("3x3 scramble")
             }
             Section {
                 TuneRow("Crown speed", value: $step, range: Ao5Settings.stepRange, step: 1)
