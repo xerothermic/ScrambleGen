@@ -45,8 +45,8 @@ enum AverageOfFive {
     /// fastest and slowest are dropped and the middle three averaged. Ties are
     /// broken by solve order (stable sort), so the dropped pair is always two
     /// different solves, even when all five times are equal. Two or more DNFs
-    /// make the average a DNF. The mean is rounded to the nearest millisecond
-    /// (the exact value is never a half, because it is a sum divided by 3).
+    /// make the average a DNF. The mean is rounded to the nearest centisecond
+    /// (times are shown with two decimals; the crown moves in whole centiseconds).
     static func compute(_ solves: [Ao5Solve]) -> Ao5Result? {
         guard solves.count == count else { return nil }
         let ranked = solves.indices.sorted { a, b in
@@ -61,22 +61,23 @@ enum AverageOfFive {
             average = nil
         } else {
             let sum = middle.reduce(0) { $0 + ($1 ?? 0) }
-            average = (2 * sum + 3) / 6   // round(sum / 3), half up
+            average = (sum + 15) / 30 * 10   // round(sum / 3) to the nearest centisecond, half up
         }
         let best = solves.compactMap { $0.effectiveMillis }.min()
         return Ao5Result(dropped: dropped, averageMillis: average, bestMillis: best)
     }
 
-    /// "8.420", "1:02.345", "DNF" for nil.
+    /// "8.42", "1:02.34", "DNF" for nil. Centiseconds, truncated (as the WCA
+    /// does for single times); milliseconds are never shown.
     static func format(_ millis: Int?) -> String {
         guard let c = millis else { return "DNF" }
-        let total = max(0, c)
-        let m = total / 60000
-        let s = (total / 1000) % 60
-        let ms = total % 1000
+        let total = max(0, c) / 10   // centiseconds
+        let m = total / 6000
+        let s = (total / 100) % 60
+        let cs = total % 100
         return m > 0
-            ? String(format: "%d:%02d.%03d", m, s, ms)
-            : String(format: "%d.%03d", s, ms)
+            ? String(format: "%d:%02d.%02d", m, s, cs)
+            : String(format: "%d.%02d", s, cs)
     }
 
     /// One solve as shown in the list: "8.420", "10.420+" for +2 (shows the
@@ -87,21 +88,21 @@ enum AverageOfFive {
         return parenthesized ? "(\(text))" : text
     }
 
-    /// Milliseconds from typed digits, entered right to left like a stopwatch
-    /// ("12345" = 12.345, "102345" = 1:02.345). Seconds above 59 carry into
-    /// minutes ("75999" = 75.999 s = 1:15.999). Clamped to `maxMillis` (10:00.000).
+    /// Milliseconds from typed digits, entered right to left like a stopwatch,
+    /// the last two digits being centiseconds ("1234" = 12.34, "10234" = 1:02.34).
+    /// Seconds above 59 carry into minutes ("7599" = 75.99 s = 1:15.99). Clamped to `maxMillis` (10:00.000).
     /// Non-digits are ignored.
     /// Longest time the Ao5 calculator accepts: 10:00.000. Everything entered or
     /// dialled is clamped to this.
     static let maxMillis = 600_000
 
     static func millis(fromDigits digits: String) -> Int {
-        let ds = digits.filter { $0 >= "0" && $0 <= "9" }.suffix(7)
+        let ds = digits.filter { $0 >= "0" && $0 <= "9" }.suffix(6)
         guard let value = Int(ds) else { return 0 }
-        let ms = value % 1000
-        let rest = value / 1000
+        let cs = value % 100
+        let rest = value / 100
         let seconds = rest % 100 + (rest / 100) * 60
-        return min(seconds * 1000 + ms, maxMillis)
+        return min(seconds * 1000 + cs * 10, maxMillis)
     }
 }
 
@@ -128,7 +129,7 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
     }
 }
 
-/// Digital Crown delta -> milliseconds. Pure (time is passed in) so it is
+/// Digital Crown delta -> steps (the Ao5 dial treats one step as one centisecond). Pure (time is passed in) so it is
 /// unit-testable. The crown binding is a Double; calibrated on device
 /// (`by: nil`, `.high`), ONE revolution = `unitsPerRev` (default 524, measured ~524.24; a setting) binding
 /// units. `stepsPerRev` turns that into detents (default 150, ~2.4

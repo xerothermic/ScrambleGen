@@ -19,16 +19,15 @@ final class AverageOfFiveTests: XCTestCase {
         XCTAssertNil(AverageOfFive.compute([]))
     }
 
-    func testRoundingToMillisecond() {
-        // middle sum 1000 -> 333.33 -> 333; 1001 -> 333.67 -> 334; 1002 -> 334
-        XCTAssertEqual(AverageOfFive.compute(solves([1, 333, 333, 334, 9999]))!.averageMillis, 333)
-        XCTAssertEqual(AverageOfFive.compute(solves([1, 333, 333, 335, 9999]))!.averageMillis, 334)
-        XCTAssertEqual(AverageOfFive.compute(solves([1, 333, 334, 335, 9999]))!.averageMillis, 334)
-        // sum 4 -> 1.33 -> 1; sum 5 -> 1.67 -> 2
-        XCTAssertEqual(AverageOfFive.compute(solves([0, 1, 1, 2, 50]))!.averageMillis, 1)
-        XCTAssertEqual(AverageOfFive.compute(solves([0, 1, 2, 2, 50]))!.averageMillis, 2)
-        // not centisecond-rounded: 12.345 average stays 12.345
-        XCTAssertEqual(AverageOfFive.compute(solves([1000, 12345, 12345, 12345, 99999]))!.averageMillis, 12345)
+    func testRoundingToCentisecond() {
+        // middle sum 1000 ms -> 333.33 ms -> 330; 1001 -> 333.67 -> 330; 1100 -> 366.67 -> 370
+        XCTAssertEqual(AverageOfFive.compute(solves([1, 333, 333, 334, 9999]))!.averageMillis, 330)
+        XCTAssertEqual(AverageOfFive.compute(solves([1, 333, 333, 335, 9999]))!.averageMillis, 330)
+        XCTAssertEqual(AverageOfFive.compute(solves([1, 350, 375, 375, 9999]))!.averageMillis, 370)
+        // exact half of a centisecond rounds up: sum 45 -> 15 ms -> 20
+        XCTAssertEqual(AverageOfFive.compute(solves([0, 15, 15, 15, 50]))!.averageMillis, 20)
+        XCTAssertEqual(AverageOfFive.compute(solves([1000, 12340, 12350, 12350, 99999]))!.averageMillis, 12350)
+        XCTAssertEqual(AverageOfFive.compute(solves([1000, 12340, 12340, 12350, 99999]))!.averageMillis, 12340)
     }
 
     func testPlus2IsAddedAndCanChangeWhichIsDropped() {
@@ -87,32 +86,33 @@ final class AverageOfFiveTests: XCTestCase {
     }
 
     func testFormat() {
-        XCTAssertEqual(AverageOfFive.format(8420), "8.420")
-        XCTAssertEqual(AverageOfFive.format(12345), "12.345")
-        XCTAssertEqual(AverageOfFive.format(5), "0.005")
-        XCTAssertEqual(AverageOfFive.format(62345), "1:02.345")
+        XCTAssertEqual(AverageOfFive.format(8420), "8.42")
+        XCTAssertEqual(AverageOfFive.format(12345), "12.34")     // truncated, no milliseconds
+        XCTAssertEqual(AverageOfFive.format(50), "0.05")
+        XCTAssertEqual(AverageOfFive.format(5), "0.00")
+        XCTAssertEqual(AverageOfFive.format(62345), "1:02.34")
+        XCTAssertEqual(AverageOfFive.format(600_000), "10:00.00")
         XCTAssertEqual(AverageOfFive.format(nil), "DNF")
     }
 
     func testLabel() {
-        XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420)), "8.420")
-        XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420, penalty: .plus2)), "10.420+")
+        XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420)), "8.42")
+        XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420, penalty: .plus2)), "10.42+")
         XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420, penalty: .dnf)), "DNF")
-        XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420), parenthesized: true), "(8.420)")
+        XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420), parenthesized: true), "(8.42)")
         XCTAssertEqual(AverageOfFive.label(Ao5Solve(millis: 8420, penalty: .dnf), parenthesized: true), "(DNF)")
     }
 
     func testDigitEntry() {
         XCTAssertEqual(AverageOfFive.millis(fromDigits: ""), 0)
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "5"), 5)
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "8420"), 8420)
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "12345"), 12345)
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "102345"), 62345)    // 1:02.345
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "75999"), 75999)     // 75.999 s
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "175999"), 135999)   // 1:75.999 = 2:15.999
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "1234567"), 600_000) // 12:34.567 clamps to 10:00.000
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "1000000"), 600_000)
-        XCTAssertEqual(AverageOfFive.millis(fromDigits: "95999"), 95999)
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "5"), 50)             // 0.05
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "842"), 8420)
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "1234"), 12340)
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "10234"), 62340)      // 1:02.34
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "7599"), 75990)       // 75.99 s
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "17599"), 135990)     // 1:75.99 = 2:15.99
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "95999"), 599_990)    // 9:59.99
+        XCTAssertEqual(AverageOfFive.millis(fromDigits: "123456"), 600_000)   // 12:34.56 clamps to 10:00.00
         XCTAssertEqual(AverageOfFive.maxMillis, 600_000)
     }
 

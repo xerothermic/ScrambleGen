@@ -168,5 +168,50 @@ for _ in range(500):
             break
 assert left > 100, f"scrambles never leave cube shape after slice 6 ({left})"
 
+# Piece-id replay (Square1State in Square1MapView.swift): derive the shape of
+# each layer from which cells hold the same piece id, and require cube shape
+# (corner, edge, corner, edge, ...) after every one of the first six slices.
+def piece_shape_is_cube(p):
+    for layer in (p[:12], p[12:]):
+        # a corner = two equal neighbouring ids; walk the ring from a boundary
+        first = next(i for i in range(12) if layer[i] != layer[(i - 1) % 12])
+        kinds, i = [], first
+        while i < first + 12:
+            if layer[i % 12] == layer[(i + 1) % 12]:
+                kinds.append("C"); i += 2
+            else:
+                kinds.append("E"); i += 1
+        if kinds.count("C") != 4 or kinds.count("E") != 4:
+            return False
+        if any(kinds[k] == kinds[(k + 1) % 8] for k in range(8)):
+            return False
+    return True
+
+
+def replay_pieces(tokens):
+    p = [0, 0, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15]
+    shapes = []
+    for tok in tokens:
+        m = TOKEN.match(tok)
+        x, y = (int(m.group(1)), int(m.group(2))) if m.group(1) else (0, 0)
+        up, down = p[:12], p[12:]
+        for i in range(12):
+            p[i] = up[(-x % 12 + i) % 12]
+            p[12 + i] = down[(-y % 12 + i) % 12]
+        for i in range(6):
+            p[6 + i], p[12 + i] = p[12 + i], p[6 + i]
+        shapes.append(piece_shape_is_cube(p))
+    return shapes
+
+
+assert piece_shape_is_cube([0, 0, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15])
+rng2 = random.Random(11)
+later_noncube = 0
+for _ in range(5000):
+    sh = replay_pieces(generate(15, rng2))
+    assert all(sh[:6]), f"left cube shape within the first six slices: {sh}"
+    later_noncube += not all(sh[6:])
+assert later_noncube > 1000, later_noncube
+
 sample = generate(15, random.Random(7))
 print(f"verified {runs} scrambles (0-30 slices); sample: {' '.join(sample)}")

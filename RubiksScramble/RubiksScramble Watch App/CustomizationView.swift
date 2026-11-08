@@ -29,7 +29,7 @@ enum Ao5Settings {
     static let accel3Key = "ao5.accelT3"
 
     static let defaultFeedback = true
-    static let defaultInterval = 10
+    static let defaultInterval = 1
     static let defaultStep = 1
     static let defaultAccel = Ao5Accel.gentle.rawValue
     static let defaultSteps = Ao5CrownMapper.defaultStepsPerRev
@@ -38,7 +38,7 @@ enum Ao5Settings {
     static let defaultAccel2 = 60
     static let defaultAccel3 = 130
 
-    static let intervalRange = 1...1000
+    static let intervalRange = 1...100
     static let stepRange = 1...100
     static let stepsRange = 10...2000
     static let unitsRange = 100...1500
@@ -160,7 +160,7 @@ struct CustomizationScreen: View {
     var body: some View {
         Form {
             Section {
-                TuneRow("Crown speed", unit: "ms", value: $step, range: Ao5Settings.stepRange, step: 1)
+                TuneRow("Crown speed", value: $step, range: Ao5Settings.stepRange, step: 1)
                 TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
                 TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
                 Picker(selection: $accel) {
@@ -173,14 +173,14 @@ struct CustomizationScreen: View {
                 .font(.system(size: 11))
                 .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                 if accel == Ao5Accel.custom.rawValue {
-                    TuneRow("10 ms from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
-                    TuneRow("100 ms from", unit: "/s", value: $accel2, range: Ao5Settings.accelRange, step: 1)
-                    TuneRow("1 s from", unit: "/s", value: $accel3, range: Ao5Settings.accelRange, step: 1)
+                    TuneRow("x10 from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
+                    TuneRow("x100 from", unit: "/s", value: $accel2, range: Ao5Settings.accelRange, step: 1)
+                    TuneRow("x1000 from", unit: "/s", value: $accel3, range: Ao5Settings.accelRange, step: 1)
                 }
                 Toggle(isOn: $feedback) { Text("Crown feedback").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                 if feedback {
-                    TuneRow("Feedback every", unit: "ms", value: $interval, range: Ao5Settings.intervalRange, step: 1)
+                    TuneRow("Feedback every", value: $interval, range: Ao5Settings.intervalRange, step: 1)
                 }
                 Button(role: .destructive) {
                     Ao5Settings.resetToDefaults()

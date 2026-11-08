@@ -18,7 +18,7 @@ def compute(solves):  # mirrors the Swift
     if dnfs >= 2 or None in mid:
         avg = None
     else:
-        avg = (2 * sum(mid) + 3) // 6
+        avg = (sum(mid) + 15) // 30 * 10   # nearest centisecond
     vals = [eff(s) for s in solves if eff(s) is not None]
     return dropped, avg, (min(vals) if vals else None)
 
@@ -29,8 +29,8 @@ def reference(solves):
     else:
         fin = sorted(v for v in vals if v is not None)
         trimmed = fin[1:-1] if len(fin) == 5 else fin[1:]  # one DNF: drop it + fastest
-        m = Fraction(sum(trimmed), 3)
-        avg = int(m) + (1 if m - int(m) >= Fraction(1, 2) else 0)
+        m = Fraction(sum(trimmed), 30)          # centiseconds
+        avg = 10 * (int(m) + (1 if m - int(m) >= Fraction(1, 2) else 0))
     fin = [v for v in vals if v is not None]
     return avg, (min(fin) if fin else None)
 
@@ -42,7 +42,8 @@ for _ in range(200000):
     assert len(d) == 2
     assert (a, b) == reference(solves), solves
 assert compute([(9000, "none")] * 5)[0] == {0, 4}
-assert compute([(1, "none"), (333, "none"), (333, "none"), (335, "none"), (9999, "none")])[1] == 334
+assert compute([(1, "none"), (333, "none"), (333, "none"), (335, "none"), (9999, "none")])[1] == 330
+assert compute([(0, "none"), (15, "none"), (15, "none"), (15, "none"), (50, "none")])[1] == 20
 
 # --- crown mapper mirror (Ao5CrownMapper) ---
 DEFAULT_UPR = UPR = 524.0                  # crown binding units per revolution (Ao5CrownMapper.unitsPerRev)
@@ -99,6 +100,17 @@ for u in (100, 524, 1500):                  # units per revolution setting
 c = (10, 20, 30)
 assert [tier(v, 1, 'custom', c) for v in (5, 15, 25, 35)] == [1, 10, 100, 1000]
 m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 3000
+# display + digit entry (mirrors AverageOfFive.format / millis(fromDigits:))
+def fmt(ms):
+    t = max(0, ms) // 10
+    m, s, cs = t // 6000, t // 100 % 60, t % 100
+    return f"{m}:{s:02d}.{cs:02d}" if m else f"{s}.{cs:02d}"
+def digits(ds):
+    v = int(ds[-6:] or 0); r = v // 100
+    return min((r % 100 + r // 100 * 60) * 1000 + v % 100 * 10, 600_000)
+assert [fmt(x) for x in (8420, 12345, 5, 62345, 600_000)] == ["8.42", "12.34", "0.00", "1:02.34", "10:00.00"]
+assert all("." in fmt(x) and len(fmt(x).split(".")[1]) == 2 for x in range(0, 600_001, 137))
+assert [digits(x) for x in ("5", "1234", "10234", "7599", "17599", "95999", "123456")] == [50, 12340, 62340, 75990, 135990, 599_990, 600_000]
 # clamping (mirrors Ao5Dial.apply)
 MAXMS = 10 * 60000   # 10:00.000
 clamp = lambda v: min(max(v, 0), MAXMS)

@@ -42,7 +42,7 @@ final class Ao5Dial {
 
     func configure(_ s: Ao5Settings.Snapshot) {
         feedback = s.feedback
-        interval = max(1, s.interval)
+        interval = max(1, s.interval) * 10   // setting is in centiseconds
         hapticIdx = millis / interval
         mapper.baseStep = max(1, s.step)
         mapper.accel = s.accel
@@ -59,7 +59,7 @@ final class Ao5Dial {
     /// the value across a detent boundary (multi-boundary jumps coalesce);
     /// hysteresis of interval/4 on reversal; no click when clamped.
     func addCrown(_ delta: Double) {
-        let ms = mapper.millis(forDelta: delta, now: ProcessInfo.processInfo.systemUptime)
+        let ms = mapper.millis(forDelta: delta, now: ProcessInfo.processInfo.systemUptime) * 10   // 1 step = 1 centisecond
         guard ms != 0 else { return }
         let old = millis
         apply(millis: millis + ms, penalty: penalty)
@@ -161,8 +161,8 @@ private struct Ao5Actions: View {
 
 /// Average-of-5 calculator: set five competition times, get the WCA Ao5.
 /// Its own top-level card in the card stack (`Ao5Card`).
-/// The Digital Crown dials the time (1 ms per unit; velocity tiers x1/x10/x100/x1000
-/// when acceleration is on; haptic tick every N ms, see Customization). Tapping a slot selects that solve (loading its time if already set);
+/// The Digital Crown dials the time (1 centisecond per step; velocity tiers x1/x10/x100/x1000
+/// when acceleration is on; haptic tick every N centiseconds, see Customization). Tapping a slot selects that solve (loading its time if already set);
 /// "Set" stores the dialled time, with the +2 / DNF toggles, in the selected
 /// slot and moves on to the next empty one. The best single and the average
 /// (once all five are set) update live. Nothing is saved; leaving the screen
