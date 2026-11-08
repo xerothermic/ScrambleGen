@@ -25,8 +25,6 @@ enum Ao5Settings {
     static let stepsKey = "ao5.stepsPerRev"
     static let unitsKey = "ao5.unitsPerRev"
     static let accel1Key = "ao5.accelT1"
-    static let accel2Key = "ao5.accelT2"
-    static let accel3Key = "ao5.accelT3"
 
     static let defaultFeedback = true
     static let defaultInterval = 1
@@ -35,8 +33,6 @@ enum Ao5Settings {
     static let defaultSteps = Ao5CrownMapper.defaultStepsPerRev
     static let defaultUnits = Int(Ao5CrownMapper.defaultUnitsPerRev)
     static let defaultAccel1 = 25
-    static let defaultAccel2 = 60
-    static let defaultAccel3 = 130
 
     static let intervalRange = 1...100
     static let stepRange = 1...100
@@ -51,7 +47,7 @@ enum Ao5Settings {
         var accel = Ao5Accel.gentle
         var stepsPerRev = defaultSteps
         var unitsPerRev = Double(defaultUnits)
-        var accelThresholds = (Double(defaultAccel1), Double(defaultAccel2), Double(defaultAccel3))
+        var accelThreshold = Double(defaultAccel1)
     }
 
     private static func int(_ d: UserDefaults, _ key: String, _ def: Int, _ range: ClosedRange<Int>) -> Int {
@@ -70,10 +66,7 @@ enum Ao5Settings {
         }
         s.stepsPerRev = int(d, stepsKey, defaultSteps, stepsRange)
         s.unitsPerRev = Double(int(d, unitsKey, defaultUnits, unitsRange))
-        let t1 = int(d, accel1Key, defaultAccel1, accelRange)
-        let t2 = max(t1, int(d, accel2Key, defaultAccel2, accelRange))
-        let t3 = max(t2, int(d, accel3Key, defaultAccel3, accelRange))
-        s.accelThresholds = (Double(t1), Double(t2), Double(t3))
+        s.accelThreshold = Double(int(d, accel1Key, defaultAccel1, accelRange))
         return s
     }
 
@@ -81,7 +74,7 @@ enum Ao5Settings {
     static func resetToDefaults() {
         let d = UserDefaults.standard
         for k in ["ao5.feedbackInterval", "ao5.crownStep", feedbackKey, intervalKey, stepKey, accelKey, stepsKey, unitsKey,
-                  accel1Key, accel2Key, accel3Key] {
+                  accel1Key, "ao5.accelT2", "ao5.accelT3"] {   // T2/T3: removed x100/x1000 tiers, cleaned up
             d.removeObject(forKey: k)
         }
     }
@@ -190,8 +183,6 @@ struct CustomizationScreen: View {
     @AppStorage(Ao5Settings.stepsKey) private var stepsPerRev = Ao5Settings.defaultSteps
     @AppStorage(Ao5Settings.unitsKey) private var units = Ao5Settings.defaultUnits
     @AppStorage(Ao5Settings.accel1Key) private var accel1 = Ao5Settings.defaultAccel1
-    @AppStorage(Ao5Settings.accel2Key) private var accel2 = Ao5Settings.defaultAccel2
-    @AppStorage(Ao5Settings.accel3Key) private var accel3 = Ao5Settings.defaultAccel3
 
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
 
@@ -204,8 +195,6 @@ struct CustomizationScreen: View {
                 AccelRow(selection: $accel)
                 if accel == Ao5Accel.custom.rawValue {
                     TuneRow("x10 from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
-                    TuneRow("x100 from", unit: "/s", value: $accel2, range: Ao5Settings.accelRange, step: 1)
-                    TuneRow("x1000 from", unit: "/s", value: $accel3, range: Ao5Settings.accelRange, step: 1)
                 }
                 Toggle(isOn: $feedback) { Text("Crown feedback").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
@@ -222,8 +211,6 @@ struct CustomizationScreen: View {
                     stepsPerRev = Ao5Settings.defaultSteps
                     units = Ao5Settings.defaultUnits
                     accel1 = Ao5Settings.defaultAccel1
-                    accel2 = Ao5Settings.defaultAccel2
-                    accel3 = Ao5Settings.defaultAccel3
                 } label: {
                     Text("Reset to defaults").font(.system(size: 11))
                 }
@@ -248,8 +235,6 @@ struct CustomizationScreen: View {
         .onChange(of: units) { DebugLog.setting("units", $0, $1) }
         .onChange(of: accel) { DebugLog.setting("accel", $0, $1) }
         .onChange(of: accel1) { DebugLog.setting("accel1", $0, $1) }
-        .onChange(of: accel2) { DebugLog.setting("accel2", $0, $1) }
-        .onChange(of: accel3) { DebugLog.setting("accel3", $0, $1) }
         .onChange(of: interval) { DebugLog.setting("interval", $0, $1) }
         .onChange(of: feedback) { DebugLog.setting("feedback", $0, $1) }
         .onChange(of: debug) { DebugLog.setting("debug", $0, $1) }

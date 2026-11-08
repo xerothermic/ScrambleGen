@@ -48,7 +48,7 @@ final class Ao5Dial {
         mapper.accel = s.accel
         mapper.stepsPerRev = s.stepsPerRev
         mapper.unitsPerRev = s.unitsPerRev
-        mapper.customThresholds = s.accelThresholds
+        mapper.customThreshold = s.accelThreshold
     }
 
     /// Forget carry and turn speed (new slot / screen / Set).
@@ -160,7 +160,7 @@ private struct Ao5Actions: View {
 
 /// Average-of-5 calculator: set five competition times, get the WCA Ao5.
 /// Its own top-level card in the card stack (`Ao5Card`).
-/// The Digital Crown dials the time (1 centisecond per step; velocity tiers x1/x10/x100/x1000
+/// The Digital Crown dials the time (1 centisecond per step; velocity tiers x1/x10
 /// when acceleration is on; haptic tick every N centiseconds, see Customization). Tapping a slot selects that solve (loading its time if already set);
 /// "Set" stores the dialled time, with the +2 / DNF toggles, in the selected
 /// slot and moves on to the next empty one. The best single and the average

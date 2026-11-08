@@ -151,8 +151,7 @@ final class AverageOfFiveTests: XCTestCase {
     func testSpeedTiersAndBase() {
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 1, base: 1, accel: .normal), 1)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, accel: .normal), 10)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 100, base: 1, accel: .normal), 100)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 1, accel: .normal), 1000)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 1, accel: .normal), 10)   // no x100/x1000 tiers
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 5, accel: .off), 5)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 1, base: 10, accel: .normal), 10)
     }
@@ -161,7 +160,7 @@ final class AverageOfFiveTests: XCTestCase {
         var m = Ao5CrownMapper()
         _ = m.millis(forDelta: 10.48, now: 1.00)
         let ms = m.millis(forDelta: 10.48, now: 1.02)      // 3 detents / 20 ms = 150/s
-        XCTAssertEqual(ms, 3000)
+        XCTAssertEqual(ms, 30)
     }
 
     func testStepsPerRevolutionSetting() {
@@ -181,8 +180,8 @@ final class AverageOfFiveTests: XCTestCase {
     func testGentleThresholdsAreHigher() {
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, accel: .gentle), 1)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, accel: .normal), 10)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 200, base: 1, accel: .gentle), 100)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 300, base: 1, accel: .gentle), 1000)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 60, base: 1, accel: .gentle), 10)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 300, base: 1, accel: .gentle), 10)
     }
 
     func testCustomUnitsPerRev() {
@@ -194,28 +193,26 @@ final class AverageOfFiveTests: XCTestCase {
     }
 
     func testCustomThresholds() {
-        let c = (10.0, 20.0, 30.0)
+        let c = 10.0
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 5, base: 1, accel: .custom, custom: c), 1)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 15, base: 1, accel: .custom, custom: c), 10)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 25, base: 1, accel: .custom, custom: c), 100)
-        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 35, base: 1, accel: .custom, custom: c), 1000)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 35, base: 1, accel: .custom, custom: c), 10)
         var m = Ao5CrownMapper()
         m.accel = .custom
-        m.customThresholds = c
+        m.customThreshold = c
         _ = m.millis(forDelta: 10.48, now: 1.00)
-        XCTAssertEqual(m.millis(forDelta: 10.48, now: 1.02), 3000)   // 150/s >= 30
+        XCTAssertEqual(m.millis(forDelta: 10.48, now: 1.02), 30)   // 150/s >= 10
     }
 
-    func testResolvedThresholds() {
-        let c = (7.0, 8.0, 9.0)
+    func testResolvedThreshold() {
+        let c = 7.0
         XCTAssertEqual(Ao5Accel.custom.cycled(by: 1), .off)
         XCTAssertEqual(Ao5Accel.off.cycled(by: -1), .custom)
         XCTAssertEqual(Ao5Accel.gentle.cycled(by: 1), .normal)
-        XCTAssertNil(Ao5Accel.off.resolvedThresholds(custom: c))
-        XCTAssertEqual(Ao5Accel.custom.resolvedThresholds(custom: c)!.0, 7)
-        XCTAssertEqual(Ao5Accel.custom.resolvedThresholds(custom: c)!.2, 9)
-        XCTAssertEqual(Ao5Accel.normal.resolvedThresholds(custom: c)!.0, 25)
-        XCTAssertEqual(Ao5Accel.gentle.resolvedThresholds(custom: c)!.2, 260)
+        XCTAssertNil(Ao5Accel.off.resolvedThreshold(custom: c))
+        XCTAssertEqual(Ao5Accel.custom.resolvedThreshold(custom: c), 7)
+        XCTAssertEqual(Ao5Accel.normal.resolvedThreshold(custom: c), 25)
+        XCTAssertEqual(Ao5Accel.gentle.resolvedThreshold(custom: c), 50)
     }
 
     func testHapticClickOnDetentCrossing() {
@@ -229,7 +226,7 @@ final class AverageOfFiveTests: XCTestCase {
 
     func testAccelCycleCoversAllModes() {
         XCTAssertEqual(Ao5Accel.allCases.map(\.rawValue), [0, 1, 2, 3])
-        XCTAssertNil(Ao5Accel.off.thresholds)
+        XCTAssertNil(Ao5Accel.off.threshold)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 1, accel: .off), 1)
     }
 }

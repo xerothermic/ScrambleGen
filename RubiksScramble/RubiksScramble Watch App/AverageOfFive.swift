@@ -106,8 +106,8 @@ enum AverageOfFive {
     }
 }
 
-/// Fast-spin acceleration mode: detents/s thresholds for the 10 ms, 100 ms
-/// and 1 s tiers. Raw value is persisted (0...2 unchanged; custom added).
+/// Fast-spin acceleration mode: one detents/s threshold above which the step is x10.
+/// Raw value is persisted (0...2 unchanged; custom added).
 enum Ao5Accel: Int, CaseIterable, Identifiable {
     case off = 0, gentle = 1, normal = 2, custom = 3
     var id: Int { rawValue }
@@ -125,17 +125,17 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
         let i = all.firstIndex(of: self) ?? 0
         return all[((i + delta) % all.count + all.count) % all.count]
     }
-    /// Preset thresholds; nil for Off, and for Custom (user values apply).
-    var thresholds: (Double, Double, Double)? {
+    /// Preset x10 threshold (detents/s); nil for Off, and for Custom (user value applies).
+    var threshold: Double? {
         switch self {
         case .off, .custom: return nil
-        case .gentle: return (50, 120, 260)
-        case .normal: return (25, 60, 130)
+        case .gentle: return 50
+        case .normal: return 25
         }
     }
-    /// Thresholds actually applied: preset, or the user's values for Custom; nil for Off.
-    func resolvedThresholds(custom: (Double, Double, Double)) -> (Double, Double, Double)? {
-        self == .custom ? custom : thresholds
+    /// Threshold actually applied: preset, or the user's value for Custom; nil for Off.
+    func resolvedThreshold(custom: Double) -> Double? {
+        self == .custom ? custom : threshold
     }
 }
 
@@ -152,8 +152,8 @@ struct Ao5CrownMapper {
     static let defaultUnitsPerRev = 524.0   // crown binding units per physical revolution (measured 524.24)
     var unitsPerRev = defaultUnitsPerRev
     var stepsPerRev = defaultStepsPerRev
-    /// Thresholds (detents/s) for the 10 ms / 100 ms / 1 s tiers in Custom mode.
-    var customThresholds = (25.0, 60.0, 130.0)
+    /// x10 threshold (detents/s) in Custom mode.
+    var customThreshold = 25.0
 
     var baseStep = 1
     var accel = Ao5Accel.gentle
@@ -165,14 +165,9 @@ struct Ao5CrownMapper {
 
     /// ms per detent for a turn speed. Slow = base step, never suppressed.
     static func step(forSpeed v: Double, base: Int, accel: Ao5Accel,
-                     custom: (Double, Double, Double) = (25, 60, 130)) -> Int {
-        guard let t = accel.resolvedThresholds(custom: custom) else { return base }
-        let tier: Int
-        if v < t.0 { tier = 1 }
-        else if v < t.1 { tier = 10 }
-        else if v < t.2 { tier = 100 }
-        else { tier = 1000 }
-        return max(base, tier)
+                     custom: Double = 25) -> Int {
+        guard let t = accel.resolvedThreshold(custom: custom) else { return base }
+        return max(base, v < t ? 1 : 10)
     }
 
     /// `delta` = change of the crown binding since the last event (any size,
@@ -192,7 +187,7 @@ struct Ao5CrownMapper {
         let whole = (detents + (detents < 0 ? -1e-9 : 1e-9)).rounded(.towardZero)   // absorb float dust (524 slow units must give exactly 150)
         carry = detents - whole
         return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), accel: accel,
-                                         custom: customThresholds)
+                                         custom: customThreshold)
     }
 }
 

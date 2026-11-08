@@ -48,15 +48,15 @@ assert compute([(0, "none"), (15, "none"), (15, "none"), (15, "none"), (50, "non
 # --- crown mapper mirror (Ao5CrownMapper) ---
 DEFAULT_UPR = UPR = 524.0                  # crown binding units per revolution (Ao5CrownMapper.unitsPerRev)
 DPU = 150.0
-TH = {'off': None, 'gentle': (50, 120, 260), 'normal': (25, 60, 130), 'custom': None}
-def tier(v, base, accel, custom=(25, 60, 130)):
+TH = {'off': None, 'gentle': 50, 'normal': 25, 'custom': None}
+def tier(v, base, accel, custom=25):
     th = custom if accel == 'custom' else TH[accel]
     if th is None: return base
-    t = 1 if v < th[0] else 10 if v < th[1] else 100 if v < th[2] else 1000
+    t = 1 if v < th else 10
     return max(base, t)
 
 class Mapper:
-    def __init__(s, base=1, accel='normal', spr=150, upr=DEFAULT_UPR, custom=(25, 60, 130)):
+    def __init__(s, base=1, accel='normal', spr=150, upr=DEFAULT_UPR, custom=25):
         s.base, s.up, s.spr, s.carry, s.speed, s.t, s.upr, s.custom = base, accel, spr, 0.0, 0.0, None, upr, custom
     def feed(s, delta, now):
         if delta == 0: return 0
@@ -83,7 +83,7 @@ for _ in range(7080):                        # smallest measured delta 0.074, ca
 assert tot == int(7080 * 0.074 / UPR * 150), tot
 m = Mapper(); assert m.feed(UPR / DPU, 1) == 1 and m.feed(-UPR / DPU, 5) == -1
 m = Mapper(); assert (m.feed(2.0, 1), m.feed(-2.0, 2), m.feed(-2.0, 3)) == (0, 0, -1)
-m = Mapper(); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 3000
+m = Mapper(); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 30
 random.seed(9)
 for _ in range(2000):   # slow one-direction turn: sum of ms == detents moved (+-1), no lost movement
     m = Mapper(); t = 0.0; units = 0.0; tot = 0
@@ -94,16 +94,16 @@ for _ in range(2000):   # slow one-direction turn: sum of ms == detents moved (+
 for n in (30, 100, 150, 1000):
     assert Mapper(spr=n).feed(UPR, 1) == n
     m = Mapper(spr=n); assert sum(m.feed(UPR / (8 * n), 10 + i) for i in range(8)) == 1
-assert tier(40, 1, 'gentle') == 1 and tier(40, 1, 'normal') == 10 and tier(300, 1, 'gentle') == 1000
+assert tier(40, 1, 'gentle') == 1 and tier(40, 1, 'normal') == 10 and tier(300, 1, 'gentle') == 10 and tier(500, 1, 'normal') == 10
 for u in (100, 524, 1500):                  # units per revolution setting
     assert Mapper(upr=u).feed(u, 1) == 150
-c = (10, 20, 30)
-assert [tier(v, 1, 'custom', c) for v in (5, 15, 25, 35)] == [1, 10, 100, 1000]
-m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 3000
+c = 10
+assert [tier(v, 1, 'custom', c) for v in (5, 15, 25, 35)] == [1, 10, 10, 10]
+m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 30
 # resolved thresholds: Custom uses user values, presets ignore them, Off is None
 res = lambda a, c: c if a == 'custom' else TH[a]
-assert res('off', (7, 8, 9)) is None and res('custom', (7, 8, 9)) == (7, 8, 9)
-assert res('normal', (7, 8, 9)) == (25, 60, 130) and res('gentle', (7, 8, 9))[2] == 260
+assert res('off', 7) is None and res('custom', 7) == 7
+assert res('normal', 7) == 25 and res('gentle', 7) == 50
 # display + digit entry (mirrors AverageOfFive.format / millis(fromDigits:))
 def fmt(ms):
     t = max(0, ms) // 10
