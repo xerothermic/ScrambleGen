@@ -10,6 +10,13 @@ enum CustomizationCard {
 /// enum of keys + defaults per feature section; screens bind with @AppStorage
 /// using these keys, and consumers call `load()` (on appear / slot change,
 /// not per crown tick).
+/// General (non-feature) settings; `debugKey` gates debug-only tools such as
+/// the Calibrate card.
+enum GeneralSettings {
+    static let debugKey = "debug.enabled"
+    static let defaultDebug = false
+}
+
 enum Ao5Settings {
     static let feedbackKey = "ao5.feedback"
     static let intervalKey = "ao5.feedbackInterval"
@@ -57,6 +64,8 @@ struct CustomizationScreen: View {
     @AppStorage(Ao5Settings.accelKey) private var accel = Ao5Settings.defaultAccel
     @AppStorage(Ao5Settings.stepsKey) private var stepsPerRev = Ao5Settings.defaultSteps
 
+    @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
+
     var body: some View {
         Form {
             Section("Ao5") {
@@ -83,6 +92,9 @@ struct CustomizationScreen: View {
                         }
                     }
                 }
+            }
+            Section("Developer") {
+                Toggle("Debug mode", isOn: $debug)
             }
         }
         .navigationTitle("Customization")

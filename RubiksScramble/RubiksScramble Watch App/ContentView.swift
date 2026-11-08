@@ -218,6 +218,7 @@ private struct CardStack: View {
     let onTimer: () -> Void
     let onAo5: () -> Void
     let onCalibrate: () -> Void
+    @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     let onCustomize: () -> Void
 
     private let cardHeight: CGFloat = 84
@@ -524,7 +525,7 @@ private struct CardStack: View {
                 }
                 timerCard
                 ao5Card
-                calibrateCard
+                if debug { calibrateCard }
                 customizeCard
                 aboutCard
             }
