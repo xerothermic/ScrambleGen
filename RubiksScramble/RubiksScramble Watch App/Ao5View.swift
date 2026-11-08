@@ -64,9 +64,7 @@ final class Ao5Dial {
         let old = millis
         apply(millis: millis + ms, penalty: penalty)
         guard feedback, old != millis else { return }
-        let idx = millis / interval
-        let margin = interval / 4
-        if idx > hapticIdx || (idx < hapticIdx && millis + margin < hapticIdx * interval) {
+        if let idx = Ao5Haptic.clickIndex(millis: millis, interval: interval, hapticIdx: hapticIdx) {
             hapticIdx = idx
             WKInterfaceDevice.current().play(.click)
         }

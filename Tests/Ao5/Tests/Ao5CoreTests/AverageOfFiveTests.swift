@@ -205,4 +205,19 @@ final class AverageOfFiveTests: XCTestCase {
         _ = m.millis(forDelta: 10.48, now: 1.00)
         XCTAssertEqual(m.millis(forDelta: 10.48, now: 1.02), 3000)   // 150/s >= 30
     }
+
+    func testHapticClickOnDetentCrossing() {
+        XCTAssertNil(Ao5Haptic.clickIndex(millis: 5, interval: 10, hapticIdx: 0))    // same detent
+        XCTAssertEqual(Ao5Haptic.clickIndex(millis: 10, interval: 10, hapticIdx: 0), 1)
+        XCTAssertEqual(Ao5Haptic.clickIndex(millis: 1000, interval: 10, hapticIdx: 0), 100)   // jump coalesces
+        XCTAssertNil(Ao5Haptic.clickIndex(millis: 9, interval: 10, hapticIdx: 1))    // within hysteresis (margin 2)
+        XCTAssertEqual(Ao5Haptic.clickIndex(millis: 7, interval: 10, hapticIdx: 1), 0)
+        XCTAssertEqual(Ao5Haptic.clickIndex(millis: 110, interval: 100, hapticIdx: 0), 1)
+    }
+
+    func testAccelCycleCoversAllModes() {
+        XCTAssertEqual(Ao5Accel.allCases.map(\.rawValue), [0, 1, 2, 3])
+        XCTAssertNil(Ao5Accel.off.thresholds)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 500, base: 1, accel: .off), 1)
+    }
 }

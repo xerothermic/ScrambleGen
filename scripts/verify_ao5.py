@@ -116,4 +116,12 @@ MAXMS = 10 * 60000   # 10:00.000
 clamp = lambda v: min(max(v, 0), MAXMS)
 assert clamp(-5) == 0 and clamp(MAXMS + 1000) == MAXMS and clamp(599_999) == 599_999
 assert MAXMS == 600_000
+# haptic detent decision (mirrors Ao5Haptic.clickIndex)
+def click_index(ms, iv, h):
+    iv = max(1, iv); i = ms // iv
+    if i > h: return i
+    if i < h and ms + iv // 4 < h * iv: return i
+    return None
+assert click_index(5, 10, 0) is None and click_index(10, 10, 0) == 1 and click_index(1000, 10, 0) == 100
+assert click_index(9, 10, 1) is None and click_index(7, 10, 1) == 0 and click_index(110, 100, 0) == 1
 print("ok")

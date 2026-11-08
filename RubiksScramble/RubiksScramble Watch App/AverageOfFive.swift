@@ -185,3 +185,17 @@ struct Ao5CrownMapper {
                                          custom: customThresholds)
     }
 }
+
+/// Haptic detent decision for the Ao5 crown (pure, tested). `millis` = new value, `interval` = detent width
+/// in ms (setting in cs * 10), `hapticIdx` = detent index last clicked/synced. Click when the value crossed up
+/// into a higher detent, or fell back by more than interval/4 below the clicked detent's lower edge
+/// (hysteresis on reversal). Returns the new index when a click is due, else nil.
+enum Ao5Haptic {
+    static func clickIndex(millis: Int, interval: Int, hapticIdx: Int) -> Int? {
+        let iv = max(1, interval)
+        let idx = millis / iv
+        if idx > hapticIdx { return idx }
+        if idx < hapticIdx && millis + iv / 4 < hapticIdx * iv { return idx }
+        return nil
+    }
+}

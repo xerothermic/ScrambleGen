@@ -19,8 +19,8 @@ enum GeneralSettings {
 
 enum Ao5Settings {
     static let feedbackKey = "ao5.feedback"
-    static let intervalKey = "ao5.feedbackInterval"
-    static let stepKey = "ao5.crownStep"
+    static let intervalKey = "ao5.feedbackInterval2"  // v2: unit changed ms -> cs in build 80; old stored values ignored
+    static let stepKey = "ao5.crownStep2"  // v2: old values (ms meaning) ignored; default 1
     static let accelKey = "ao5.accelLevel"
     static let stepsKey = "ao5.stepsPerRev"
     static let unitsKey = "ao5.unitsPerRev"
@@ -80,7 +80,7 @@ enum Ao5Settings {
     /// Removes every Ao5 key so all defaults apply.
     static func resetToDefaults() {
         let d = UserDefaults.standard
-        for k in [feedbackKey, intervalKey, stepKey, accelKey, stepsKey, unitsKey,
+        for k in ["ao5.feedbackInterval", "ao5.crownStep", feedbackKey, intervalKey, stepKey, accelKey, stepsKey, unitsKey,
                   accel1Key, accel2Key, accel3Key] {
             d.removeObject(forKey: k)
         }
@@ -163,14 +163,19 @@ struct CustomizationScreen: View {
                 TuneRow("Crown speed", value: $step, range: Ao5Settings.stepRange, step: 1)
                 TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
                 TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
-                Picker(selection: $accel) {
-                    ForEach(Ao5Accel.allCases) { a in
-                        Text(a.title).tag(a.rawValue)
-                    }
+                Button {
+                    let all = Ao5Accel.allCases
+                    let cur = all.firstIndex { $0.rawValue == accel } ?? 0
+                    accel = all[(cur + 1) % all.count].rawValue
                 } label: {
-                    Text("Acceleration").font(.system(size: 11))
+                    HStack {
+                        Text("Acceleration").font(.system(size: 11))
+                        Spacer()
+                        Text((Ao5Accel(rawValue: accel) ?? .gentle).title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.tint)
+                    }
                 }
-                .font(.system(size: 11))
                 .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                 if accel == Ao5Accel.custom.rawValue {
                     TuneRow("x10 from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
