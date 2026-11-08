@@ -87,6 +87,53 @@ enum Ao5Settings {
     }
 }
 
+/// Compact tunable row: caption label, then "-  value unit  +" on one line.
+/// Fits 41/45/49 mm without truncation (single-line, scales down if needed).
+struct TuneRow: View {
+    let label: String
+    let unit: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    let step: Int
+
+    init(_ label: String, unit: String = "", value: Binding<Int>,
+         range: ClosedRange<Int>, step: Int = 1) {
+        self.label = label
+        self.unit = unit
+        self._value = value
+        self.range = range
+        self.step = step
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+            HStack(spacing: 4) {
+                Button { value = max(range.lowerBound, value - step) } label: {
+                    Image(systemName: "minus")
+                }
+                .buttonStyle(.bordered)
+                .disabled(value <= range.lowerBound)
+                Text(unit.isEmpty ? "\(value)" : "\(value) \(unit)")
+                    .font(.caption.monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity)
+                Button { value = min(range.upperBound, value + step) } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.bordered)
+                .disabled(value >= range.upperBound)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 /// Settings screen: one Section per feature, so adding a feature = adding a
 /// Section here (and its keys above).
 struct CustomizationScreen: View {
@@ -105,38 +152,26 @@ struct CustomizationScreen: View {
     var body: some View {
         Form {
             Section("Ao5") {
-                Stepper(value: $step, in: Ao5Settings.stepRange) {
-                    Text("Crown speed \(step) ms")
-                }
-                Stepper(value: $stepsPerRev, in: Ao5Settings.stepsRange, step: 10) {
-                    Text("Steps per rev \(stepsPerRev)")
-                }
-                Stepper(value: $units, in: Ao5Settings.unitsRange, step: 10) {
-                    Text("Units per rev \(units)")
-                }
-                Picker("Acceleration", selection: $accel) {
+                TuneRow("Crown speed", unit: "ms", value: $step, range: Ao5Settings.stepRange, step: 1)
+                TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
+                TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
+                Picker(selection: $accel) {
                     ForEach(Ao5Accel.allCases) { a in
                         Text(a.title).tag(a.rawValue)
                     }
+                } label: {
+                    Text("Acceleration").font(.caption)
                 }
                 if accel == Ao5Accel.custom.rawValue {
-                    Stepper(value: $accel1, in: Ao5Settings.accelRange) {
-                        Text("10 ms from \(accel1)/s")
-                    }
-                    Stepper(value: $accel2, in: Ao5Settings.accelRange) {
-                        Text("100 ms from \(accel2)/s")
-                    }
-                    Stepper(value: $accel3, in: Ao5Settings.accelRange) {
-                        Text("1 s from \(accel3)/s")
-                    }
+                    TuneRow("10 ms from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
+                    TuneRow("100 ms from", unit: "/s", value: $accel2, range: Ao5Settings.accelRange, step: 1)
+                    TuneRow("1 s from", unit: "/s", value: $accel3, range: Ao5Settings.accelRange, step: 1)
                 }
-                Toggle("Crown feedback", isOn: $feedback)
+                Toggle(isOn: $feedback) { Text("Crown feedback").font(.caption) }
                 if feedback {
-                    Stepper(value: $interval, in: Ao5Settings.intervalRange) {
-                        Text("Feedback every \(interval) ms")
-                    }
+                    TuneRow("Feedback every", unit: "ms", value: $interval, range: Ao5Settings.intervalRange, step: 1)
                 }
-                Button("Reset to defaults", role: .destructive) {
+                Button(role: .destructive) {
                     Ao5Settings.resetToDefaults()
                     feedback = Ao5Settings.defaultFeedback
                     interval = Ao5Settings.defaultInterval
@@ -147,10 +182,12 @@ struct CustomizationScreen: View {
                     accel1 = Ao5Settings.defaultAccel1
                     accel2 = Ao5Settings.defaultAccel2
                     accel3 = Ao5Settings.defaultAccel3
+                } label: {
+                    Text("Reset to defaults").font(.caption)
                 }
             }
             Section("Developer") {
-                Toggle("Debug mode", isOn: $debug)
+                Toggle(isOn: $debug) { Text("Debug mode").font(.caption) }
             }
         }
         .navigationTitle("Customization")
