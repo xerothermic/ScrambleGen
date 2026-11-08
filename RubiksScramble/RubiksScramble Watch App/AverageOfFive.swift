@@ -119,6 +119,12 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
         case .custom: return "Custom"
         }
     }
+    /// Next/previous mode, wrapping (used by the '<' '>' buttons).
+    func cycled(by delta: Int) -> Ao5Accel {
+        let all = Ao5Accel.allCases
+        let i = all.firstIndex(of: self) ?? 0
+        return all[((i + delta) % all.count + all.count) % all.count]
+    }
     /// Preset thresholds; nil for Off, and for Custom (user values apply).
     var thresholds: (Double, Double, Double)? {
         switch self {

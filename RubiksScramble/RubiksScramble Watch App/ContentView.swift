@@ -34,6 +34,7 @@ struct ContentView: View {
     @State private var showAo5 = false
     @State private var showCustom = false
     @State private var showCalibrate = false   // Calibrate card (debug tool)
+    @State private var showInputLog = false    // Input log card (debug tool)
     // Timer solve times; outlive the card being closed and are restored from
     // UserDefaults when the app is relaunched.
     @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
@@ -50,7 +51,7 @@ struct ContentView: View {
     private func close() {
         hideTask?.cancel()
         showClose = false
-        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAo5 = false; showCustom = false; showCalibrate = false }
+        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAo5 = false; showCustom = false; showCalibrate = false; showInputLog = false }
     }
 
     private func scheduleHide() {
@@ -65,13 +66,27 @@ struct ContentView: View {
     private func touchBegan() {
         guard !touching else { return }
         touching = true
+        DebugLog.log("drag start")
         hideTask?.cancel()
         withAnimation(.easeIn(duration: 0.15)) { showClose = true }
     }
 
     private func touchEnded() {
         touching = false
+        DebugLog.log("drag end")
         scheduleHide()
+    }
+
+    /// Screens that contain Lists/NavigationLinks/Buttons do not get the
+    /// container-wide drag gestures (they may swallow row taps on device);
+    /// they close via this toolbar button or the left-edge strip instead.
+    private var gesturesOff: Bool { showCustom || showInputLog }
+
+    @ToolbarContentBuilder
+    private var closeToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button { DebugLog.log("tap close"); close() } label: { Image(systemName: "xmark") }
+        }
     }
 
     @ViewBuilder
@@ -86,8 +101,10 @@ struct ContentView: View {
             NavigationStack { Ao5Screen() }
         } else if showCalibrate {
             NavigationStack { CalibrateScreen() }
+        } else if showInputLog {
+            NavigationStack { InputLogScreen().toolbar { closeToolbar } }
         } else if showCustom {
-            NavigationStack { CustomizationScreen() }
+            NavigationStack { CustomizationScreen().toolbar { closeToolbar } }
         } else {
             AboutView()
         }
@@ -126,7 +143,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if openPuzzle != nil || showAbout || showTimer || showAo5 || showCustom || showCalibrate {
+            if openPuzzle != nil || showAbout || showTimer || showAo5 || showCustom || showCalibrate || showInputLog {
                 openContent
                     .background(
                         // The tapped card grows into this tinted full-screen panel.
@@ -135,12 +152,14 @@ struct ContentView: View {
                                    ?? (showTimer ? TimerCard.color
                                        : showAo5 ? Ao5Card.color
                                        : showCalibrate ? CalibrateCard.color
+                                       : showInputLog ? InputLogCard.color
                                        : showCustom ? CustomizationCard.color : AboutCard.color))
                                 .opacity(0.35))
                             .matchedGeometryEffect(id: openPuzzle?.rawValue
                                                    ?? (showTimer ? TimerCard.id
                                                        : showAo5 ? Ao5Card.id
                                                        : showCalibrate ? CalibrateCard.id
+                                                       : showInputLog ? InputLogCard.id
                                                        : showCustom ? CustomizationCard.id : AboutCard.id),
                                                    in: cardSpace)
                             .ignoresSafeArea()
@@ -150,7 +169,8 @@ struct ContentView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { _ in touchBegan() }
-                            .onEnded { _ in touchEnded() }
+                            .onEnded { _ in touchEnded() },
+                        including: gesturesOff ? .subviews : .all
                     )
                     // Rightward swipe that starts at the left edge also closes.
                     // Vertical paging and taps are unaffected.
@@ -160,9 +180,19 @@ struct ContentView: View {
                                 if g.startLocation.x < 28,
                                    g.translation.width > 50,
                                    abs(g.translation.height) < 40 { close() }
-                            }
+                            },
+                        including: gesturesOff ? .subviews : .all
                     )
-                    .overlay(alignment: .topLeading) { closeButton }
+                    .overlay(alignment: .leading) {
+                        if gesturesOff {
+                            // Narrow edge strip only, so rows are never covered.
+                            Color.clear.frame(width: 10).contentShape(Rectangle())
+                                .gesture(DragGesture(minimumDistance: 20).onEnded { g in
+                                    if g.translation.width > 50, abs(g.translation.height) < 40 { close() }
+                                })
+                        }
+                    }
+                    .overlay(alignment: .topLeading) { closeButton.allowsHitTesting(!gesturesOff) }
                     .environment(\.closeShown, showClose)
                     .transition(.opacity)
             } else {
@@ -177,6 +207,8 @@ struct ContentView: View {
                     withAnimation(Self.spring) { showAo5 = true }
                 }, onCalibrate: {
                     withAnimation(Self.spring) { showCalibrate = true }
+                }, onInputLog: {
+                    withAnimation(Self.spring) { showInputLog = true }
                 }, onCustomize: {
                     withAnimation(Self.spring) { showCustom = true }
                 })
@@ -192,6 +224,7 @@ struct ContentView: View {
             showAo5 = false
             showCustom = false
             showCalibrate = false
+            showInputLog = false
             if let target = target.puzzle {
                 puzzle = target
                 showTimer = false
@@ -218,6 +251,7 @@ private struct CardStack: View {
     let onTimer: () -> Void
     let onAo5: () -> Void
     let onCalibrate: () -> Void
+    let onInputLog: () -> Void
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     let onCustomize: () -> Void
 
@@ -422,6 +456,51 @@ private struct CardStack: View {
         .accessibilityLabel("Calibrate, debug crown measurement")
     }
 
+    private var inputLogCard: some View {
+        Button(action: onInputLog) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Input log")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Debug taps")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [InputLogCard.color, InputLogCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: InputLogCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Input log, debug")
+    }
+
     private var customizeCard: some View {
         Button(action: onCustomize) {
             HStack(alignment: .top) {
@@ -525,7 +604,7 @@ private struct CardStack: View {
                 }
                 timerCard
                 ao5Card
-                if debug { calibrateCard }
+                if debug { calibrateCard; inputLogCard }
                 customizeCard
                 aboutCard
             }

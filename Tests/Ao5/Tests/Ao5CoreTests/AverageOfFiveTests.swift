@@ -208,6 +208,9 @@ final class AverageOfFiveTests: XCTestCase {
 
     func testResolvedThresholds() {
         let c = (7.0, 8.0, 9.0)
+        XCTAssertEqual(Ao5Accel.custom.cycled(by: 1), .off)
+        XCTAssertEqual(Ao5Accel.off.cycled(by: -1), .custom)
+        XCTAssertEqual(Ao5Accel.gentle.cycled(by: 1), .normal)
         XCTAssertNil(Ao5Accel.off.resolvedThresholds(custom: c))
         XCTAssertEqual(Ao5Accel.custom.resolvedThresholds(custom: c)!.0, 7)
         XCTAssertEqual(Ao5Accel.custom.resolvedThresholds(custom: c)!.2, 9)

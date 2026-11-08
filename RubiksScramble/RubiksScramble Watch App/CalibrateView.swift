@@ -127,7 +127,7 @@ struct CalibrateScreen: View {
                 .digitalCrownRotation($crown, from: -1_000_000, through: 1_000_000, by: nil,
                                       sensitivity: .high, isContinuous: true,
                                       isHapticFeedbackEnabled: false)
-                .onChange(of: crown) { _, new in probe.record(new) }
+                .onChange(of: crown) { old, new in probe.record(new); DebugLog.crown(new, delta: new - old) }
             HStack(spacing: 4) {
                 Button { probe.mark(); WKInterfaceDevice.current().play(.click) } label: {
                     Text("Mark")

@@ -142,32 +142,41 @@ private func sectionHeader(_ title: String) -> some View {
     Text(title).font(.system(size: 10, weight: .semibold)).textCase(nil)
 }
 
-/// Acceleration choice list: whole row is a plain button; sets the value and dismisses.
-struct Ao5AccelPicker: View {
+/// Acceleration row: same control type as TuneRow ('<' and '>' bordered buttons around the mode name).
+/// Replaces the NavigationLink/Button-with-HStack-label row that did not respond on device (builds 82/83).
+struct AccelRow: View {
     @Binding var selection: Int
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        List {
-            ForEach(Ao5Accel.allCases) { mode in
+        let mode = Ao5Accel(rawValue: selection) ?? .gentle
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Acceleration")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
                 Button {
-                    selection = mode.rawValue
-                    dismiss()
+                    selection = mode.cycled(by: -1).rawValue
+                    DebugLog.log("tap accel <")
                 } label: {
-                    HStack {
-                        Text(mode.title).font(.system(size: 14))
-                        Spacer()
-                        if selection == mode.rawValue {
-                            Image(systemName: "checkmark").foregroundStyle(.tint)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                    Image(systemName: "chevron.left").font(.system(size: 10, weight: .semibold))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                Text(mode.title)
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                Button {
+                    selection = mode.cycled(by: 1).rawValue
+                    DebugLog.log("tap accel >")
+                } label: {
+                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
             }
         }
-        .navigationTitle("Acceleration")
+        .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
     }
 }
 
@@ -192,18 +201,7 @@ struct CustomizationScreen: View {
                 TuneRow("Crown speed", value: $step, range: Ao5Settings.stepRange, step: 1)
                 TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
                 TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
-                NavigationLink {
-                    Ao5AccelPicker(selection: $accel)
-                } label: {
-                    HStack {
-                        Text("Acceleration").font(.system(size: 11))
-                        Spacer()
-                        Text((Ao5Accel(rawValue: accel) ?? .gentle).title)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.tint)
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                AccelRow(selection: $accel)
                 if accel == Ao5Accel.custom.rawValue {
                     TuneRow("x10 from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 1)
                     TuneRow("x100 from", unit: "/s", value: $accel2, range: Ao5Settings.accelRange, step: 1)
@@ -215,6 +213,7 @@ struct CustomizationScreen: View {
                     TuneRow("Feedback every", value: $interval, range: Ao5Settings.intervalRange, step: 1)
                 }
                 Button(role: .destructive) {
+                    DebugLog.log("tap Reset")
                     Ao5Settings.resetToDefaults()
                     feedback = Ao5Settings.defaultFeedback
                     interval = Ao5Settings.defaultInterval
@@ -236,11 +235,23 @@ struct CustomizationScreen: View {
             Section {
                 Toggle(isOn: $debug) { Text("Debug mode").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("debug toggle")
             } header: {
                 sectionHeader("Developer")
             }
         }
         .font(.system(size: 11))
         .navigationTitle("Customization")
+        .onAppear { DebugLog.log("Customization appeared (container drags gated off)") }
+        .onChange(of: step) { DebugLog.setting("step", $0, $1) }
+        .onChange(of: stepsPerRev) { DebugLog.setting("stepsPerRev", $0, $1) }
+        .onChange(of: units) { DebugLog.setting("units", $0, $1) }
+        .onChange(of: accel) { DebugLog.setting("accel", $0, $1) }
+        .onChange(of: accel1) { DebugLog.setting("accel1", $0, $1) }
+        .onChange(of: accel2) { DebugLog.setting("accel2", $0, $1) }
+        .onChange(of: accel3) { DebugLog.setting("accel3", $0, $1) }
+        .onChange(of: interval) { DebugLog.setting("interval", $0, $1) }
+        .onChange(of: feedback) { DebugLog.setting("feedback", $0, $1) }
+        .onChange(of: debug) { DebugLog.setting("debug", $0, $1) }
     }
 }

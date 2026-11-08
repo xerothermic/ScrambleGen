@@ -108,6 +108,7 @@ private struct Ao5DialTime: View {
                 if recentring { recentring = false; return }
                 let d = new - old
                 guard d != 0 else { return }
+                DebugLog.crown(new, delta: d)
                 dial.addCrown(d)
                 // Keep well away from the crown range ends (fast spins).
                 if abs(new - Self.crownMid) > Self.crownMid * 0.25 {
