@@ -119,29 +119,30 @@ final class AverageOfFiveTests: XCTestCase {
         var m = Ao5CrownMapper()
         var total = 0
         var t = 0.0
-        for _ in 0..<100 { t += 0.5; total += m.millis(forDelta: 0.001, now: t) }   // 0.15 detent each
-        XCTAssertEqual(total, 15)                                                    // 0.1 rev = 15 detents
+        for _ in 0..<1000 { t += 0.5; total += m.millis(forDelta: 0.074, now: t) }   // smallest measured delta, 0.0212 detent each
+        XCTAssertEqual(total, 21)                                                    // 74 units = 21.18 detents
     }
 
     func testFullSlowRevolutionYieldsAbout150ms() {
         var m = Ao5CrownMapper()
         var total = 0
         var t = 0.0
-        for _ in 0..<1000 { t += 0.5; total += m.millis(forDelta: 0.001, now: t) }   // 1.0 unit
+        for _ in 0..<524 { t += 0.5; total += m.millis(forDelta: 1.0, now: t) }   // 524 units = 1 rev, slow
         XCTAssertEqual(total, 150)
+        XCTAssertEqual(Ao5CrownMapper.unitsPerRev, 524.0)
     }
 
     func testNeverZeroForWholeDetent() {
         var m = Ao5CrownMapper()
-        XCTAssertEqual(m.millis(forDelta: 1.0 / Double(Ao5CrownMapper.defaultStepsPerRev), now: 1), 1)
-        XCTAssertEqual(m.millis(forDelta: -1.0 / Double(Ao5CrownMapper.defaultStepsPerRev), now: 5), -1)
+        XCTAssertEqual(m.millis(forDelta: Ao5CrownMapper.unitsPerRev / Double(Ao5CrownMapper.defaultStepsPerRev), now: 1), 1)
+        XCTAssertEqual(m.millis(forDelta: -Ao5CrownMapper.unitsPerRev / Double(Ao5CrownMapper.defaultStepsPerRev), now: 5), -1)
     }
 
     func testReversalDropsOppositeCarry() {
         var m = Ao5CrownMapper()
-        XCTAssertEqual(m.millis(forDelta: 0.004, now: 1), 0)     // 0.6 detent carried
-        XCTAssertEqual(m.millis(forDelta: -0.004, now: 2), 0)    // carry cleared, -0.6 carried
-        XCTAssertEqual(m.millis(forDelta: -0.004, now: 3), -1)   // -1.2 -> -1
+        XCTAssertEqual(m.millis(forDelta: 2.0, now: 1), 0)     // 0.57 detent carried
+        XCTAssertEqual(m.millis(forDelta: -2.0, now: 2), 0)    // carry cleared, -0.57 carried
+        XCTAssertEqual(m.millis(forDelta: -2.0, now: 3), -1)   // -1.14 -> -1
     }
 
     func testSpeedTiersAndBase() {
@@ -155,8 +156,8 @@ final class AverageOfFiveTests: XCTestCase {
 
     func testFastSpinAccelerates() {
         var m = Ao5CrownMapper()
-        _ = m.millis(forDelta: 0.02, now: 1.00)
-        let ms = m.millis(forDelta: 0.02, now: 1.02)      // 3 detents / 20 ms = 150/s
+        _ = m.millis(forDelta: 10.48, now: 1.00)
+        let ms = m.millis(forDelta: 10.48, now: 1.02)      // 3 detents / 20 ms = 150/s
         XCTAssertEqual(ms, 3000)
     }
 
@@ -164,12 +165,12 @@ final class AverageOfFiveTests: XCTestCase {
         for n in [30, 100, 150, 1000] {
             var m = Ao5CrownMapper()
             m.stepsPerRev = n
-            XCTAssertEqual(m.millis(forDelta: 1.0, now: 1), n)     // one revolution = n detents
+            XCTAssertEqual(m.millis(forDelta: Ao5CrownMapper.unitsPerRev, now: 1), n)     // one revolution = n detents
             // carry works for any n: 8 deltas of 1/(8n) revolution = 1 detent total
             var m2 = Ao5CrownMapper()
             m2.stepsPerRev = n
             var total = 0
-            for i in 0..<8 { total += m2.millis(forDelta: 1.0 / (8.0 * Double(n)), now: 10 + Double(i)) }
+            for i in 0..<8 { total += m2.millis(forDelta: Ao5CrownMapper.unitsPerRev / (8.0 * Double(n)), now: 10 + Double(i)) }
             XCTAssertEqual(total, 1)
         }
     }

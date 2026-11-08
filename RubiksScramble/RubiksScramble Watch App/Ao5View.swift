@@ -83,7 +83,8 @@ private struct Ao5DialTime: View {
     @State private var recentring = false
     @FocusState private var focused: Bool
 
-    private static let crownMid = 1_000.0
+    /// ~1000 revolutions of headroom either side (524 units per revolution).
+    private static let crownMid = 1_000.0 * Ao5CrownMapper.unitsPerRev
 
     var body: some View {
         let dnf = dial.penalty == .dnf
@@ -100,8 +101,8 @@ private struct Ao5DialTime: View {
             }
             .focusable()
             .focused($focused)
-            .digitalCrownRotation($crown, from: 0, through: Self.crownMid * 2, by: 0.001,
-                                  sensitivity: .medium, isContinuous: false,
+            .digitalCrownRotation($crown, from: 0, through: Self.crownMid * 2, by: nil,
+                                  sensitivity: .high, isContinuous: false,
                                   isHapticFeedbackEnabled: false)
             .onChange(of: crown) { old, new in
                 if recentring { recentring = false; return }
@@ -109,7 +110,7 @@ private struct Ao5DialTime: View {
                 guard d != 0 else { return }
                 dial.addCrown(d)
                 // Keep well away from the crown range ends (fast spins).
-                if abs(new - Self.crownMid) > Self.crownMid * 0.5 {
+                if abs(new - Self.crownMid) > Self.crownMid * 0.25 {
                     recentring = true
                     crown = Self.crownMid
                 }

@@ -45,6 +45,7 @@ assert compute([(9000, "none")] * 5)[0] == {0, 4}
 assert compute([(1, "none"), (333, "none"), (333, "none"), (335, "none"), (9999, "none")])[1] == 334
 
 # --- crown mapper mirror (Ao5CrownMapper) ---
+UPR = 524.0                  # crown binding units per revolution (Ao5CrownMapper.unitsPerRev)
 DPU = 150.0
 TH = {'off': None, 'gentle': (50, 120, 260), 'normal': (25, 60, 130)}
 def tier(v, base, accel):
@@ -57,7 +58,7 @@ class Mapper:
     def __init__(s, base=1, accel='normal', spr=150): s.base, s.up, s.spr, s.carry, s.speed, s.t = base, accel, spr, 0.0, 0.0, None
     def feed(s, delta, now):
         if delta == 0: return 0
-        d = delta * s.spr
+        d = delta / UPR * s.spr
         if (d > 0 and s.carry < 0) or (d < 0 and s.carry > 0): s.carry = 0.0
         if s.t is not None and now - s.t <= 0.3:
             inst = abs(d) / max(now - s.t, 0.01)
@@ -66,27 +67,31 @@ class Mapper:
             s.speed = 0.0
         s.t = now
         d += s.carry
-        whole = int(d)  # toward zero
+        whole = int(d + (-1e-9 if d < 0 else 1e-9))  # toward zero, absorbing float dust
         s.carry = d - whole
         return whole * tier(s.speed, max(1, s.base), s.up)
 
 m = Mapper(); tot = 0; t = 0.0
-for _ in range(1000):
-    t += 0.5; tot += m.feed(0.001, t)
-assert tot == 150, tot                       # slow full unit = 150 ms
-m = Mapper(); assert m.feed(1 / DPU, 1) == 1 and m.feed(-1 / DPU, 5) == -1
-m = Mapper(); assert (m.feed(0.004, 1), m.feed(-0.004, 2), m.feed(-0.004, 3)) == (0, 0, -1)
-m = Mapper(); m.feed(0.02, 1.00); assert m.feed(0.02, 1.02) == 3000
+for _ in range(524):
+    t += 0.5; tot += m.feed(1.0, t)
+assert tot == 150, tot                       # slow full revolution (524 units) = 150 ms
+m = Mapper(); tot = 0; t = 0.0
+for _ in range(7080):                        # smallest measured delta 0.074, carried: 524 units
+    t += 0.5; tot += m.feed(0.074, t)
+assert tot == int(7080 * 0.074 / UPR * 150), tot
+m = Mapper(); assert m.feed(UPR / DPU, 1) == 1 and m.feed(-UPR / DPU, 5) == -1
+m = Mapper(); assert (m.feed(2.0, 1), m.feed(-2.0, 2), m.feed(-2.0, 3)) == (0, 0, -1)
+m = Mapper(); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 3000
 random.seed(9)
 for _ in range(2000):   # slow one-direction turn: sum of ms == detents moved (+-1), no lost movement
     m = Mapper(); t = 0.0; units = 0.0; tot = 0
     for _ in range(200):
-        t += 1.0; dlt = random.random() * 0.01
+        t += 1.0; dlt = random.random() * 5.0
         units += dlt; tot += m.feed(dlt, t)
-    assert abs(tot - units * DPU) < 1.0 + 1e-6
+    assert abs(tot - units / UPR * DPU) < 1.0 + 1e-6
 for n in (30, 100, 150, 1000):
-    assert Mapper(spr=n).feed(1.0, 1) == n
-    m = Mapper(spr=n); assert sum(m.feed(1.0 / (8 * n), 10 + i) for i in range(8)) == 1
+    assert Mapper(spr=n).feed(UPR, 1) == n
+    m = Mapper(spr=n); assert sum(m.feed(UPR / (8 * n), 10 + i) for i in range(8)) == 1
 assert tier(40, 1, 'gentle') == 1 and tier(40, 1, 'normal') == 10 and tier(300, 1, 'gentle') == 1000
 # clamping (mirrors Ao5Dial.apply)
 MAXMS = 59 * 60000 + 59999

@@ -122,15 +122,16 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
 }
 
 /// Digital Crown delta -> milliseconds. Pure (time is passed in) so it is
-/// unit-testable. The crown binding is a Double whose unit is roughly one
-/// revolution (Apple's XCUI `rotateDigitalCrown(delta:)` calls 1.0 a full
-/// rotation); `stepsPerRev` turns that into detents (default 150, ~2.4
-/// degrees each). Fractional detents are CARRIED, never
+/// unit-testable. The crown binding is a Double; calibrated on device
+/// (`by: nil`, `.high`), ONE revolution = `unitsPerRev` (~524.24) binding
+/// units. `stepsPerRev` turns that into detents (default 150, ~2.4
+/// degrees each): detents = delta / unitsPerRev * stepsPerRev. Fractional detents are CARRIED, never
 /// truncated, so slow turns always add up; every whole detent is worth at
 /// least the base step (>= 1 ms). Speed (detents/s, smoothed, restarting
 /// after a 0.3 s pause) only raises the step when acceleration is on.
 struct Ao5CrownMapper {
     static let defaultStepsPerRev = 150
+    static let unitsPerRev = 524.0       // crown binding units per physical revolution (measured 524.24)
     var stepsPerRev = defaultStepsPerRev
 
     var baseStep = 1
@@ -156,7 +157,7 @@ struct Ao5CrownMapper {
     /// including tiny fractions); `now` = monotonic seconds. Returns signed ms.
     mutating func millis(forDelta delta: Double, now: Double) -> Int {
         guard delta != 0 else { return 0 }
-        var detents = delta * Double(max(1, stepsPerRev))
+        var detents = delta / Self.unitsPerRev * Double(max(1, stepsPerRev))
         if (detents > 0 && carry < 0) || (detents < 0 && carry > 0) { carry = 0 }   // reversal
         if let t = lastTime, now - t <= 0.3 {
             let inst = abs(detents) / max(now - t, 0.01)
@@ -166,7 +167,7 @@ struct Ao5CrownMapper {
         }
         lastTime = now
         detents += carry
-        let whole = detents.rounded(.towardZero)
+        let whole = (detents + (detents < 0 ? -1e-9 : 1e-9)).rounded(.towardZero)   // absorb float dust (524 slow units must give exactly 150)
         carry = detents - whole
         return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), accel: accel)
     }

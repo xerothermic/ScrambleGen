@@ -99,9 +99,9 @@ private struct CrownStats: View {
                 Text("MARKED: turn 1 rev, tap Mark")
             } else if let u = probe.revUnits, let e = probe.revEvents {
                 Text("rev \(f(u)) units, \(e) ev")
-                Text("= \(String(format: "%.1f", u * Double(stepsPerRev))) steps at \(stepsPerRev)/rev")
+                Text("= \(String(format: "%.1f", u / Ao5CrownMapper.unitsPerRev * Double(stepsPerRev))) steps at \(stepsPerRev)/rev")
             } else {
-                Text("map \(Ao5CrownMapper.defaultStepsPerRev) def, set \(stepsPerRev)")
+                Text("map \(String(format: "%.0f", Ao5CrownMapper.unitsPerRev)) u/rev, \(stepsPerRev) steps")
             }
         }
         .font(.system(size: 9, design: .monospaced))
