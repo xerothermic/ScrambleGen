@@ -1,8 +1,8 @@
 import SwiftUI
 import WatchKit
 
-// TEMPORARY: Calibrate card, a Digital Crown measuring tool. Remove the card
-// (ContentView) and this file once steps-per-revolution is calibrated.
+// Calibrate card: a Digital Crown measuring tool. A debug tool, only listed when
+// Customization > Developer > Debug mode is on.
 
 enum CalibrateCard {
     static let id = "calibrate"

@@ -33,7 +33,7 @@ struct ContentView: View {
     @State private var showTimer = false
     @State private var showAo5 = false
     @State private var showCustom = false
-    @State private var showCalibrate = false   // TEMPORARY Calibrate card
+    @State private var showCalibrate = false   // Calibrate card (debug tool)
     // Timer solve times; outlive the card being closed and are restored from
     // UserDefaults when the app is relaunched.
     @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
@@ -383,7 +383,7 @@ private struct CardStack: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Calibrate")
                         .font(.system(size: 17, weight: .bold))
-                    Text("Temporary")
+                    Text("Debug")
                         .font(.caption2)
                         .opacity(0.8)
                     Spacer()
@@ -419,7 +419,7 @@ private struct CardStack: View {
                                   anchor: .center, perspective: 0.6)
                 .scaleEffect(1 - abs(phase.value) * 0.04)
         }
-        .accessibilityLabel("Calibrate, temporary crown measurement")
+        .accessibilityLabel("Calibrate, debug crown measurement")
     }
 
     private var customizeCard: some View {
