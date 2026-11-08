@@ -47,6 +47,8 @@ final class Ao5Dial {
         mapper.baseStep = max(1, s.step)
         mapper.accel = s.accel
         mapper.stepsPerRev = s.stepsPerRev
+        mapper.unitsPerRev = s.unitsPerRev
+        mapper.customThresholds = s.accelThresholds
     }
 
     /// Forget carry and turn speed (new slot / screen / Set).
@@ -83,8 +85,8 @@ private struct Ao5DialTime: View {
     @State private var recentring = false
     @FocusState private var focused: Bool
 
-    /// ~1000 revolutions of headroom either side (524 units per revolution).
-    private static let crownMid = 1_000.0 * Ao5CrownMapper.unitsPerRev
+    /// ~1000 revolutions of headroom either side (~524 units per revolution by default).
+    private static let crownMid = 1_000.0 * Ao5CrownMapper.defaultUnitsPerRev
 
     var body: some View {
         let dnf = dial.penalty == .dnf
@@ -208,6 +210,7 @@ struct Ao5Screen: View {
         entries = Array(repeating: nil, count: AverageOfFive.count)
         selected = 0
         dial.resetMotion()
+        dial.configure(Ao5Settings.load())
         dial.set(millis: 0, penalty: .none)
     }
 

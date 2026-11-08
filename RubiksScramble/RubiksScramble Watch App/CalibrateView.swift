@@ -77,6 +77,7 @@ final class CrownProbe {
 private struct CrownStats: View {
     let probe: CrownProbe
     let stepsPerRev: Int
+    let unitsPerRev: Double
 
     private func f(_ v: Double) -> String { String(format: "%.6f", v) }
 
@@ -99,9 +100,9 @@ private struct CrownStats: View {
                 Text("MARKED: turn 1 rev, tap Mark")
             } else if let u = probe.revUnits, let e = probe.revEvents {
                 Text("rev \(f(u)) units, \(e) ev")
-                Text("= \(String(format: "%.1f", u / Ao5CrownMapper.unitsPerRev * Double(stepsPerRev))) steps at \(stepsPerRev)/rev")
+                Text("= \(String(format: "%.1f", u / unitsPerRev * Double(stepsPerRev))) steps at \(stepsPerRev)/rev")
             } else {
-                Text("map \(String(format: "%.0f", Ao5CrownMapper.unitsPerRev)) u/rev, \(stepsPerRev) steps")
+                Text("map \(String(format: "%.0f", unitsPerRev)) u/rev, \(stepsPerRev) steps")
             }
         }
         .font(.system(size: 9, design: .monospaced))
@@ -116,10 +117,11 @@ struct CalibrateScreen: View {
     @State private var crown = 0.0
     @FocusState private var focused: Bool
     @State private var stepsPerRev = Ao5Settings.load().stepsPerRev
+    @State private var unitsPerRev = Ao5Settings.load().unitsPerRev
 
     var body: some View {
         VStack(spacing: 3) {
-            CrownStats(probe: probe, stepsPerRev: stepsPerRev)
+            CrownStats(probe: probe, stepsPerRev: stepsPerRev, unitsPerRev: unitsPerRev)
                 .focusable()
                 .focused($focused)
                 .digitalCrownRotation($crown, from: -1_000_000, through: 1_000_000, by: nil,
@@ -148,6 +150,7 @@ struct CalibrateScreen: View {
         .onAppear {
             focused = true
             stepsPerRev = Ao5Settings.load().stepsPerRev
+            unitsPerRev = Ao5Settings.load().unitsPerRev
         }
     }
 }

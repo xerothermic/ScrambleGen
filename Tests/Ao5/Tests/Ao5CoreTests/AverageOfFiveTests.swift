@@ -129,13 +129,13 @@ final class AverageOfFiveTests: XCTestCase {
         var t = 0.0
         for _ in 0..<524 { t += 0.5; total += m.millis(forDelta: 1.0, now: t) }   // 524 units = 1 rev, slow
         XCTAssertEqual(total, 150)
-        XCTAssertEqual(Ao5CrownMapper.unitsPerRev, 524.0)
+        XCTAssertEqual(m.unitsPerRev, 524.0)
     }
 
     func testNeverZeroForWholeDetent() {
         var m = Ao5CrownMapper()
-        XCTAssertEqual(m.millis(forDelta: Ao5CrownMapper.unitsPerRev / Double(Ao5CrownMapper.defaultStepsPerRev), now: 1), 1)
-        XCTAssertEqual(m.millis(forDelta: -Ao5CrownMapper.unitsPerRev / Double(Ao5CrownMapper.defaultStepsPerRev), now: 5), -1)
+        XCTAssertEqual(m.millis(forDelta: Ao5CrownMapper.defaultUnitsPerRev / Double(Ao5CrownMapper.defaultStepsPerRev), now: 1), 1)
+        XCTAssertEqual(m.millis(forDelta: -Ao5CrownMapper.defaultUnitsPerRev / Double(Ao5CrownMapper.defaultStepsPerRev), now: 5), -1)
     }
 
     func testReversalDropsOppositeCarry() {
@@ -165,12 +165,12 @@ final class AverageOfFiveTests: XCTestCase {
         for n in [30, 100, 150, 1000] {
             var m = Ao5CrownMapper()
             m.stepsPerRev = n
-            XCTAssertEqual(m.millis(forDelta: Ao5CrownMapper.unitsPerRev, now: 1), n)     // one revolution = n detents
+            XCTAssertEqual(m.millis(forDelta: Ao5CrownMapper.defaultUnitsPerRev, now: 1), n)     // one revolution = n detents
             // carry works for any n: 8 deltas of 1/(8n) revolution = 1 detent total
             var m2 = Ao5CrownMapper()
             m2.stepsPerRev = n
             var total = 0
-            for i in 0..<8 { total += m2.millis(forDelta: Ao5CrownMapper.unitsPerRev / (8.0 * Double(n)), now: 10 + Double(i)) }
+            for i in 0..<8 { total += m2.millis(forDelta: Ao5CrownMapper.defaultUnitsPerRev / (8.0 * Double(n)), now: 10 + Double(i)) }
             XCTAssertEqual(total, 1)
         }
     }
@@ -180,5 +180,26 @@ final class AverageOfFiveTests: XCTestCase {
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 40, base: 1, accel: .normal), 10)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 200, base: 1, accel: .gentle), 100)
         XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 300, base: 1, accel: .gentle), 1000)
+    }
+
+    func testCustomUnitsPerRev() {
+        for u in [100.0, 524.0, 1500.0] {
+            var m = Ao5CrownMapper()
+            m.unitsPerRev = u
+            XCTAssertEqual(m.millis(forDelta: u, now: 1), 150)
+        }
+    }
+
+    func testCustomThresholds() {
+        let c = (10.0, 20.0, 30.0)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 5, base: 1, accel: .custom, custom: c), 1)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 15, base: 1, accel: .custom, custom: c), 10)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 25, base: 1, accel: .custom, custom: c), 100)
+        XCTAssertEqual(Ao5CrownMapper.step(forSpeed: 35, base: 1, accel: .custom, custom: c), 1000)
+        var m = Ao5CrownMapper()
+        m.accel = .custom
+        m.customThresholds = c
+        _ = m.millis(forDelta: 10.48, now: 1.00)
+        XCTAssertEqual(m.millis(forDelta: 10.48, now: 1.02), 3000)   // 150/s >= 30
     }
 }

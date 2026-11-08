@@ -100,21 +100,23 @@ enum AverageOfFive {
     }
 }
 
-/// Fast-spin acceleration level: detents/s thresholds for the 10 ms, 100 ms
-/// and 1 s tiers. Raw value is persisted.
+/// Fast-spin acceleration mode: detents/s thresholds for the 10 ms, 100 ms
+/// and 1 s tiers. Raw value is persisted (0...2 unchanged; custom added).
 enum Ao5Accel: Int, CaseIterable, Identifiable {
-    case off = 0, gentle = 1, normal = 2
+    case off = 0, gentle = 1, normal = 2, custom = 3
     var id: Int { rawValue }
     var title: String {
         switch self {
         case .off: return "Off"
         case .gentle: return "Gentle"
         case .normal: return "Normal"
+        case .custom: return "Custom"
         }
     }
+    /// Preset thresholds; nil for Off, and for Custom (user values apply).
     var thresholds: (Double, Double, Double)? {
         switch self {
-        case .off: return nil
+        case .off, .custom: return nil
         case .gentle: return (50, 120, 260)
         case .normal: return (25, 60, 130)
         }
@@ -123,7 +125,7 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
 
 /// Digital Crown delta -> milliseconds. Pure (time is passed in) so it is
 /// unit-testable. The crown binding is a Double; calibrated on device
-/// (`by: nil`, `.high`), ONE revolution = `unitsPerRev` (~524.24) binding
+/// (`by: nil`, `.high`), ONE revolution = `unitsPerRev` (default 524, measured ~524.24; a setting) binding
 /// units. `stepsPerRev` turns that into detents (default 150, ~2.4
 /// degrees each): detents = delta / unitsPerRev * stepsPerRev. Fractional detents are CARRIED, never
 /// truncated, so slow turns always add up; every whole detent is worth at
@@ -131,8 +133,11 @@ enum Ao5Accel: Int, CaseIterable, Identifiable {
 /// after a 0.3 s pause) only raises the step when acceleration is on.
 struct Ao5CrownMapper {
     static let defaultStepsPerRev = 150
-    static let unitsPerRev = 524.0       // crown binding units per physical revolution (measured 524.24)
+    static let defaultUnitsPerRev = 524.0   // crown binding units per physical revolution (measured 524.24)
+    var unitsPerRev = defaultUnitsPerRev
     var stepsPerRev = defaultStepsPerRev
+    /// Thresholds (detents/s) for the 10 ms / 100 ms / 1 s tiers in Custom mode.
+    var customThresholds = (25.0, 60.0, 130.0)
 
     var baseStep = 1
     var accel = Ao5Accel.gentle
@@ -143,8 +148,9 @@ struct Ao5CrownMapper {
     mutating func reset() { carry = 0; speed = 0; lastTime = nil }
 
     /// ms per detent for a turn speed. Slow = base step, never suppressed.
-    static func step(forSpeed v: Double, base: Int, accel: Ao5Accel) -> Int {
-        guard let t = accel.thresholds else { return base }
+    static func step(forSpeed v: Double, base: Int, accel: Ao5Accel,
+                     custom: (Double, Double, Double) = (25, 60, 130)) -> Int {
+        guard let t = accel == .custom ? custom : accel.thresholds else { return base }
         let tier: Int
         if v < t.0 { tier = 1 }
         else if v < t.1 { tier = 10 }
@@ -157,7 +163,7 @@ struct Ao5CrownMapper {
     /// including tiny fractions); `now` = monotonic seconds. Returns signed ms.
     mutating func millis(forDelta delta: Double, now: Double) -> Int {
         guard delta != 0 else { return 0 }
-        var detents = delta / Self.unitsPerRev * Double(max(1, stepsPerRev))
+        var detents = delta / max(1, unitsPerRev) * Double(max(1, stepsPerRev))
         if (detents > 0 && carry < 0) || (detents < 0 && carry > 0) { carry = 0 }   // reversal
         if let t = lastTime, now - t <= 0.3 {
             let inst = abs(detents) / max(now - t, 0.01)
@@ -169,6 +175,7 @@ struct Ao5CrownMapper {
         detents += carry
         let whole = (detents + (detents < 0 ? -1e-9 : 1e-9)).rounded(.towardZero)   // absorb float dust (524 slow units must give exactly 150)
         carry = detents - whole
-        return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), accel: accel)
+        return Int(whole) * Self.step(forSpeed: speed, base: max(1, baseStep), accel: accel,
+                                         custom: customThresholds)
     }
 }

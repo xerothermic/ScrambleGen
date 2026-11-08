@@ -45,20 +45,21 @@ assert compute([(9000, "none")] * 5)[0] == {0, 4}
 assert compute([(1, "none"), (333, "none"), (333, "none"), (335, "none"), (9999, "none")])[1] == 334
 
 # --- crown mapper mirror (Ao5CrownMapper) ---
-UPR = 524.0                  # crown binding units per revolution (Ao5CrownMapper.unitsPerRev)
+DEFAULT_UPR = UPR = 524.0                  # crown binding units per revolution (Ao5CrownMapper.unitsPerRev)
 DPU = 150.0
-TH = {'off': None, 'gentle': (50, 120, 260), 'normal': (25, 60, 130)}
-def tier(v, base, accel):
-    th = TH[accel]
+TH = {'off': None, 'gentle': (50, 120, 260), 'normal': (25, 60, 130), 'custom': None}
+def tier(v, base, accel, custom=(25, 60, 130)):
+    th = custom if accel == 'custom' else TH[accel]
     if th is None: return base
     t = 1 if v < th[0] else 10 if v < th[1] else 100 if v < th[2] else 1000
     return max(base, t)
 
 class Mapper:
-    def __init__(s, base=1, accel='normal', spr=150): s.base, s.up, s.spr, s.carry, s.speed, s.t = base, accel, spr, 0.0, 0.0, None
+    def __init__(s, base=1, accel='normal', spr=150, upr=DEFAULT_UPR, custom=(25, 60, 130)):
+        s.base, s.up, s.spr, s.carry, s.speed, s.t, s.upr, s.custom = base, accel, spr, 0.0, 0.0, None, upr, custom
     def feed(s, delta, now):
         if delta == 0: return 0
-        d = delta / UPR * s.spr
+        d = delta / max(1, s.upr) * s.spr
         if (d > 0 and s.carry < 0) or (d < 0 and s.carry > 0): s.carry = 0.0
         if s.t is not None and now - s.t <= 0.3:
             inst = abs(d) / max(now - s.t, 0.01)
@@ -69,7 +70,7 @@ class Mapper:
         d += s.carry
         whole = int(d + (-1e-9 if d < 0 else 1e-9))  # toward zero, absorbing float dust
         s.carry = d - whole
-        return whole * tier(s.speed, max(1, s.base), s.up)
+        return whole * tier(s.speed, max(1, s.base), s.up, s.custom)
 
 m = Mapper(); tot = 0; t = 0.0
 for _ in range(524):
@@ -93,6 +94,11 @@ for n in (30, 100, 150, 1000):
     assert Mapper(spr=n).feed(UPR, 1) == n
     m = Mapper(spr=n); assert sum(m.feed(UPR / (8 * n), 10 + i) for i in range(8)) == 1
 assert tier(40, 1, 'gentle') == 1 and tier(40, 1, 'normal') == 10 and tier(300, 1, 'gentle') == 1000
+for u in (100, 524, 1500):                  # units per revolution setting
+    assert Mapper(upr=u).feed(u, 1) == 150
+c = (10, 20, 30)
+assert [tier(v, 1, 'custom', c) for v in (5, 15, 25, 35)] == [1, 10, 100, 1000]
+m = Mapper(accel='custom', custom=c); m.feed(10.48, 1.00); assert m.feed(10.48, 1.02) == 3000
 # clamping (mirrors Ao5Dial.apply)
 MAXMS = 59 * 60000 + 59999
 clamp = lambda v: min(max(v, 0), MAXMS)
