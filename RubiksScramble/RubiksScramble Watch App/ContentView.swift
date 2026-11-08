@@ -197,6 +197,19 @@ struct ContentView: View {
                 moves[option] = option.generate(
                     length: lengths[option] ?? option.defaultLength)
             }
+            // Random-state 3x3: build the solver tables in the background; the
+            // random-move scramble above is shown until they are ready, then
+            // swapped for a random-state one if the user hasn't asked for a new one.
+            if ScrambleSource.randomStateEnabled {
+                let placeholder = moves[.cube3x3]
+                Task {
+                    await Task.detached(priority: .utility) { _ = RandomState333.prepare() }.value
+                    if moves[.cube3x3] == placeholder, ScrambleSource.randomStateEnabled {
+                        moves[.cube3x3] = await ScrambleSource.next(
+                            for: .cube3x3, length: lengths[.cube3x3] ?? Puzzle.cube3x3.defaultLength)
+                    }
+                }
+            }
         }
     }
 }
@@ -716,11 +729,15 @@ private struct ScrambleScreen: View {
                     .onAppear { crownLength = Double(length) }
 
                     Button {
-                        moves[puzzle] = puzzle.generate(length: length)
                         isSelected = false
-                        // Show the new move list from its first move.
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            proxy.scrollTo(Self.topID, anchor: .top)
+                        // 3x3 random-state scrambles take a moment off the main
+                        // thread; the others come back immediately.
+                        Task {
+                            moves[puzzle] = await ScrambleSource.next(for: puzzle, length: length)
+                            // Show the new move list from its first move.
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                proxy.scrollTo(Self.topID, anchor: .top)
+                            }
                         }
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")

@@ -48,9 +48,16 @@ struct CustomizationScreen: View {
     @AppStorage(Ao5Settings.intervalKey) private var interval = Ao5Settings.defaultInterval
     @AppStorage(Ao5Settings.stepKey) private var step = Ao5Settings.defaultStep
     @AppStorage(Ao5Settings.speedUpKey) private var speedUp = Ao5Settings.defaultSpeedUp
+    @AppStorage(ScrambleSource.randomStateKey) private var randomState = ScrambleSource.defaultRandomState
 
     var body: some View {
         Form {
+            Section("3x3 scramble") {
+                Toggle("Random-state (WCA-style)", isOn: $randomState)
+                    .onChange(of: randomState) { _, on in
+                        if on { ScrambleSource.prewarm() }
+                    }
+            }
             Section("Ao5") {
                 Picker("Crown speed", selection: $step) {
                     ForEach(Ao5Settings.steps, id: \.self) { ms in
