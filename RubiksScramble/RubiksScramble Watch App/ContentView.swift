@@ -37,15 +37,20 @@ private struct PuzzlePage: View {
 
     var body: some View {
         // Scramble on top; swipe down for the puzzle's state after it.
-        TabView(selection: $page) {
+        // Clock has no map page, so it is just the scramble screen.
+        if puzzle == .clock {
             ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
-                .tag(0)
-            switch puzzle {
-            case .cube3x3: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
-            case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+        } else {
+            TabView(selection: $page) {
+                ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
+                    .tag(0)
+                switch puzzle {
+                case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+                default: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
+                }
             }
+            .tabViewStyle(.verticalPage)
         }
-        .tabViewStyle(.verticalPage)
     }
 }
 
@@ -76,7 +81,11 @@ private struct ScrambleScreen: View {
     /// widest move — 2 chars for 3×3 (`R'`), 8 for Square-1 (`(-5,-5)/`) —
     /// and each row holds as many as fit across the smallest watch.
     private var scrambleRows: String {
-        let (width, perRow) = puzzle == .cube3x3 ? (2, 5) : (8, 2)
+        let (width, perRow) = switch puzzle {
+        case .cube3x3: (2, 5)
+        case .square1: (8, 2)
+        case .clock: (5, 3) // `ALL3+`, `UR4+ DR3- DL5-` per row
+        }
         let padded = (moves[puzzle] ?? []).map {
             (puzzle == .square1 ? Self.aligned($0) : $0)
                 .padding(toLength: width, withPad: " ", startingAt: 0)
@@ -105,6 +114,8 @@ private struct ScrambleScreen: View {
                     // Square-1: how to read the notation.
                     Text(puzzle == .cube3x3
                          ? "White top · Green front"
+                         : puzzle == .clock
+                         ? "12 o'clock up · y2 = flip"
                          : "(top, bottom) · / = slice")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
@@ -115,7 +126,7 @@ private struct ScrambleScreen: View {
                         .background(Capsule().fill(Color.accentColor))
 
                     Text(scrambleRows)
-                        .font(.system(size: puzzle == .cube3x3 ? 19 : 16,
+                        .font(.system(size: puzzle == .cube3x3 ? 19 : puzzle == .clock ? 14 : 16,
                                       weight: .semibold, design: .monospaced))
                         .multilineTextAlignment(.leading)
                         .minimumScaleFactor(0.7)
@@ -127,68 +138,70 @@ private struct ScrambleScreen: View {
                         .contentShape(Rectangle())
                         .onTapGesture { isSelected = false }
 
-                    // Crown-capture pill. Tap toggles focus (tap the scramble
-                    // notation above also deactivates). No Button — on watchOS, Button taps move
-                    // focus to themselves and would fight with our binding.
-                    VStack(spacing: 5) {
-                        HStack(spacing: 6) {
-                            Image(systemName: lengthFocused
-                                  ? "dial.medium.fill"
-                                  : "dial.medium")
-                            Text("\(puzzle.lengthLabel) \(length)")
-                        }
-                        // Thermometer: count within the puzzle's range.
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill((lengthFocused ? Color.black : Color.white).opacity(0.25))
-                                Capsule()
-                                    .fill(lengthFocused ? Color.black : Color.accentColor)
-                                    .frame(width: max(4, geo.size.width * lengthFraction))
+                    if puzzle.hasLength {
+                        // Crown-capture pill. Tap toggles focus (tap the scramble
+                        // notation above also deactivates). No Button — on watchOS, Button taps move
+                        // focus to themselves and would fight with our binding.
+                        VStack(spacing: 5) {
+                            HStack(spacing: 6) {
+                                Image(systemName: lengthFocused
+                                      ? "dial.medium.fill"
+                                      : "dial.medium")
+                                Text("\(puzzle.lengthLabel) \(length)")
                             }
+                            // Thermometer: count within the puzzle's range.
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill((lengthFocused ? Color.black : Color.white).opacity(0.25))
+                                    Capsule()
+                                        .fill(lengthFocused ? Color.black : Color.accentColor)
+                                        .frame(width: max(4, geo.size.width * lengthFraction))
+                                }
+                            }
+                            .frame(height: 4)
                         }
-                        .frame(height: 4)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(lengthFocused ? Color.black : Color.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
+                        .background(
+                            Capsule().fill(lengthFocused
+                                           ? Color.accentColor
+                                           : Color.gray.opacity(0.30))
+                        )
+                        .contentShape(Capsule())
+                        .focusable(isSelected)
+                        .focused($focus, equals: .length)
+                        // Tap toggles: first tap selects (crown adjusts the
+                        // count), second tap deselects (crown scrolls the page).
+                        .onTapGesture { isSelected.toggle() }
+                        .sensoryFeedback(.selection, trigger: isSelected)
+                        .onChange(of: isSelected) { _, selected in
+                            // Hand the crown to / take it from the pill. Deferred
+                            // a tick so focusable(true) has been applied first.
+                            Task { @MainActor in focus = selected ? .length : nil }
+                        }
+                        // Focus lost externally (user scrolled the page, swiped
+                        // away): deselect. Only reacts to losing an actual focus,
+                        // so the not-yet-focused moment after selecting is ignored.
+                        .onChange(of: focus) { old, new in
+                            if old == .length, new == nil, isSelected { isSelected = false }
+                        }
+                        .digitalCrownRotation(
+                            $crownLength,
+                            from: Double(puzzle.lengthRange.lowerBound),
+                            through: Double(puzzle.lengthRange.upperBound),
+                            by: 1.0,
+                            sensitivity: .medium,
+                            isContinuous: false,
+                            isHapticFeedbackEnabled: true
+                        )
+                        .onChange(of: crownLength) { _, v in
+                            lengths[puzzle] = Int(v.rounded())
+                        }
+                        .onAppear { crownLength = Double(length) }
                     }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(lengthFocused ? Color.black : Color.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 14)
-                    .background(
-                        Capsule().fill(lengthFocused
-                                       ? Color.accentColor
-                                       : Color.gray.opacity(0.30))
-                    )
-                    .contentShape(Capsule())
-                    .focusable(isSelected)
-                    .focused($focus, equals: .length)
-                    // Tap toggles: first tap selects (crown adjusts the
-                    // count), second tap deselects (crown scrolls the page).
-                    .onTapGesture { isSelected.toggle() }
-                    .sensoryFeedback(.selection, trigger: isSelected)
-                    .onChange(of: isSelected) { _, selected in
-                        // Hand the crown to / take it from the pill. Deferred
-                        // a tick so focusable(true) has been applied first.
-                        Task { @MainActor in focus = selected ? .length : nil }
-                    }
-                    // Focus lost externally (user scrolled the page, swiped
-                    // away): deselect. Only reacts to losing an actual focus,
-                    // so the not-yet-focused moment after selecting is ignored.
-                    .onChange(of: focus) { old, new in
-                        if old == .length, new == nil, isSelected { isSelected = false }
-                    }
-                    .digitalCrownRotation(
-                        $crownLength,
-                        from: Double(puzzle.lengthRange.lowerBound),
-                        through: Double(puzzle.lengthRange.upperBound),
-                        by: 1.0,
-                        sensitivity: .medium,
-                        isContinuous: false,
-                        isHapticFeedbackEnabled: true
-                    )
-                    .onChange(of: crownLength) { _, v in
-                        lengths[puzzle] = Int(v.rounded())
-                    }
-                    .onAppear { crownLength = Double(length) }
 
                     Button {
                         moves[puzzle] = puzzle.generate(length: length)
@@ -201,13 +214,15 @@ private struct ScrambleScreen: View {
                     }
                     .buttonStyle(.borderedProminent)
 
-                    VStack(spacing: 2) {
-                        Image(systemName: "chevron.compact.down")
-                        Text(puzzle == .cube3x3 ? "Cube map" : "Square-1 map")
-                            .font(.caption2)
+                    if puzzle != .clock {
+                        VStack(spacing: 2) {
+                            Image(systemName: "chevron.compact.down")
+                            Text(puzzle == .cube3x3 ? "Cube map" : "Square-1 map")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                     }
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 2)
                 }
                 .padding(.horizontal, 4)
             }

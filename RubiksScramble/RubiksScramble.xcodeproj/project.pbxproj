@@ -13,6 +13,7 @@
 		AA0000000000000000000019 /* CubeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000018 /* CubeState.swift */; };
 		AA000000000000000000001B /* CubeMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001A /* CubeMapView.swift */; };
 		AA000000000000000000001D /* Square1Scrambler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001C /* Square1Scrambler.swift */; };
+		AA0000000000000000000C02 /* ClockScrambler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000C01 /* ClockScrambler.swift */; };
 		AA000000000000000000001F /* Square1MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001E /* Square1MapView.swift */; };
 		AA0000000000000000000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000016 /* Assets.xcassets */; };
 		AA0000000000000000000021 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* PrivacyInfo.xcprivacy */; };
@@ -51,6 +52,7 @@
 		AA0000000000000000000018 /* CubeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CubeState.swift; sourceTree = "<group>"; };
 		AA000000000000000000001A /* CubeMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CubeMapView.swift; sourceTree = "<group>"; };
 		AA000000000000000000001C /* Square1Scrambler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Square1Scrambler.swift; sourceTree = "<group>"; };
+		AA0000000000000000000C01 /* ClockScrambler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockScrambler.swift; sourceTree = "<group>"; };
 		AA000000000000000000001E /* Square1MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Square1MapView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA0000000000000000000020 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 				AA0000000000000000000018 /* CubeState.swift */,
 				AA000000000000000000001A /* CubeMapView.swift */,
 				AA000000000000000000001C /* Square1Scrambler.swift */,
+				AA0000000000000000000C01 /* ClockScrambler.swift */,
 				AA000000000000000000001E /* Square1MapView.swift */,
 				AA0000000000000000000016 /* Assets.xcassets */,
 				AA0000000000000000000020 /* PrivacyInfo.xcprivacy */,
@@ -205,6 +208,7 @@
 				AA0000000000000000000019 /* CubeState.swift in Sources */,
 				AA000000000000000000001B /* CubeMapView.swift in Sources */,
 				AA000000000000000000001D /* Square1Scrambler.swift in Sources */,
+				AA0000000000000000000C02 /* ClockScrambler.swift in Sources */,
 				AA000000000000000000001F /* Square1MapView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
