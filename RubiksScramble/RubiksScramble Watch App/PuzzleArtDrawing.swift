@@ -16,7 +16,23 @@ enum PuzzleArtDrawing {
         case .square1:
             drawSquare1(&context, center: center, radius: side * 0.29,
                         lineWidth: lineWidth, fullColor: true)
+        case .clock:
+            drawClock(&context, center: center, radius: side * 0.34, lineWidth: lineWidth * 1.6)
         }
+    }
+
+    /// Simple clock face: ring plus hour and minute hands (Clock puzzle).
+    static func drawClock(_ context: inout GraphicsContext, center: CGPoint, radius: CGFloat,
+                          lineWidth: CGFloat, opacity: Double = 1.0) {
+        let ring = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
+                                          width: radius * 2, height: radius * 2))
+        context.stroke(ring, with: .color(.white.opacity(opacity)), lineWidth: lineWidth)
+        var hands = Path()
+        hands.move(to: CGPoint(x: center.x, y: center.y - radius * 0.7))
+        hands.addLine(to: center)
+        hands.addLine(to: CGPoint(x: center.x + radius * 0.45, y: center.y))
+        context.stroke(hands, with: .color(.white.opacity(opacity)),
+                       style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
     }
 
     // MARK: Colours
@@ -288,6 +304,9 @@ enum PuzzleArtDrawing {
             drawCubeLine(&context, center: center, edge: side * 0.48, layer: layer)
         case .square1:
             drawSquare1Line(&context, center: center, radius: side * 0.26, layer: layer)
+        case .clock:
+            drawClock(&context, center: center, radius: side * 0.30, lineWidth: max(0.8, side * 0.02),
+                      opacity: layer == 0 ? 1.0 : (layer == 1 ? 0.6 : 0.32))
         }
     }
 

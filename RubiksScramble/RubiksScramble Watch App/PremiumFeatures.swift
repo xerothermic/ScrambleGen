@@ -5,7 +5,8 @@ import Foundation
 /// Premium covers: persistent solve history beyond the last 20, the stats and
 /// charts screens, and the experimental "Motion insights" (quiet time).
 ///
-/// For now everything is unlocked (`isUnlocked == true`, no purchase exists).
+/// For now there is no purchase: the features are available only while the
+/// "Beta features" switch (Customization > Developer) is on.
 /// When StoreKit is added, turn `isUnlocked` into a computed property backed by
 /// the verified entitlement (non-consumable) and keep every premium screen
 /// asking this one flag, so the gate stays in one spot. Free data collection
@@ -13,7 +14,7 @@ import Foundation
 /// their history, they just can't open the premium screens.
 struct PremiumFeatures {
     /// TODO(StoreKit): replace with the entitlement check.
-    static let isUnlocked = true
+    static var isUnlocked: Bool { UserDefaults.standard.bool(forKey: GeneralSettings.betaKey) }
 }
 
 /// Setting keys and limits for "Motion insights" (opt-in motion recording and

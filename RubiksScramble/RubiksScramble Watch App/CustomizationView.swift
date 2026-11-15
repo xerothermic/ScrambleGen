@@ -15,6 +15,10 @@ enum CustomizationCard {
 enum GeneralSettings {
     static let debugKey = "debug.enabled"
     static let defaultDebug = false
+    /// Beta features (Algorithms card, Clock scrambles, Premium history/stats/
+    /// motion insights): unpolished, hidden unless this is on.
+    static let betaKey = "beta.enabled"
+    static let defaultBeta = false
 }
 
 enum Ao5Settings {
@@ -185,6 +189,7 @@ struct CustomizationScreen: View {
     @AppStorage(Ao5Settings.accel1Key) private var accel1 = Ao5Settings.defaultAccel1
 
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
+    @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
 
     var body: some View {
         Form {
@@ -223,6 +228,9 @@ struct CustomizationScreen: View {
                 Toggle(isOn: $debug) { Text("Debug mode").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .logTap("debug toggle")
+                Toggle(isOn: $beta) { Text("Beta features").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("beta toggle")
             } header: {
                 sectionHeader("Developer")
             }
@@ -238,5 +246,6 @@ struct CustomizationScreen: View {
         .onChange(of: interval) { DebugLog.setting("interval", $0, $1) }
         .onChange(of: feedback) { DebugLog.setting("feedback", $0, $1) }
         .onChange(of: debug) { DebugLog.setting("debug", $0, $1) }
+        .onChange(of: beta) { DebugLog.setting("beta", $0, $1) }
     }
 }

@@ -270,6 +270,7 @@ private struct CardStack: View {
     let onCalibrate: () -> Void
     let onInputLog: () -> Void
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
+    @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
     let onCustomize: () -> Void
 
     private let cardHeight: CGFloat = 84
@@ -621,7 +622,7 @@ private struct CardStack: View {
             VStack(spacing: gap) {
                 // Top to bottom: 3x3 (first, tallest), Square-1, Timer, Algorithms, Ao5, Customization, About
                 // (last, smallest and quietest).
-                ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
+                ForEach(Array(Puzzle.allCases.filter { beta || $0 != .clock }.enumerated()), id: \.element) { index, option in
                     Button {
                         onPick(option)
                     } label: {
@@ -669,7 +670,7 @@ private struct CardStack: View {
                     .accessibilityLabel("\(option.name) scramble")
                 }
                 timerCard
-                algosCard
+                if beta { algosCard }
                 ao5Card
                 if debug { calibrateCard; inputLogCard }
                 customizeCard
