@@ -33,6 +33,10 @@ struct ContentView: View {
     // Reopens on the Timer card when a run was in progress at relaunch.
     @State private var showTimer = TimerCard.hasActiveRun
     @State private var showAlgos = false
+    @State private var showAo5 = false
+    @State private var showCustom = false
+    @State private var showCalibrate = false   // Calibrate card (debug tool)
+    @State private var showInputLog = false    // Input log card (debug tool)
     // Timer solve times; outlive the card being closed and are restored from
     // UserDefaults when the app is relaunched.
     @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
@@ -49,7 +53,7 @@ struct ContentView: View {
     private func close() {
         hideTask?.cancel()
         showClose = false
-        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAlgos = false }
+        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAlgos = false; showAo5 = false; showCustom = false; showCalibrate = false; showInputLog = false }
     }
 
     private func scheduleHide() {
@@ -64,13 +68,27 @@ struct ContentView: View {
     private func touchBegan() {
         guard !touching else { return }
         touching = true
+        DebugLog.log("drag start")
         hideTask?.cancel()
         withAnimation(.easeIn(duration: 0.15)) { showClose = true }
     }
 
     private func touchEnded() {
         touching = false
+        DebugLog.log("drag end")
         scheduleHide()
+    }
+
+    /// Screens that contain Lists/NavigationLinks/Buttons do not get the
+    /// container-wide drag gestures (they may swallow row taps on device);
+    /// they close via this toolbar button or the left-edge strip instead.
+    private var gesturesOff: Bool { showCustom || showInputLog }
+
+    @ToolbarContentBuilder
+    private var closeToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button { DebugLog.log("tap close"); close() } label: { Image(systemName: "xmark") }
+        }
     }
 
     @ViewBuilder
@@ -83,6 +101,14 @@ struct ContentView: View {
             AlgoScreen()
         } else if showTimer {
             TimerScreen(solves: $timerSolves)
+        } else if showAo5 {
+            NavigationStack { Ao5Screen() }
+        } else if showCalibrate {
+            NavigationStack { CalibrateScreen() }
+        } else if showInputLog {
+            NavigationStack { InputLogScreen().toolbar { closeToolbar } }
+        } else if showCustom {
+            NavigationStack { CustomizationScreen().toolbar { closeToolbar } }
         } else {
             AboutView()
         }
@@ -123,18 +149,26 @@ struct ContentView: View {
     private var panelColor: Color {
         if let open = openPuzzle { return open.cardColor }
         if showAlgos { return AlgoCardInfo.color }
+        if showAo5 { return Ao5Card.color }
+        if showCalibrate { return CalibrateCard.color }
+        if showInputLog { return InputLogCard.color }
+        if showCustom { return CustomizationCard.color }
         return showTimer ? TimerCard.color : AboutCard.color
     }
 
     private var panelID: String {
         if let open = openPuzzle { return open.rawValue }
         if showAlgos { return AlgoCardInfo.id }
+        if showAo5 { return Ao5Card.id }
+        if showCalibrate { return CalibrateCard.id }
+        if showInputLog { return InputLogCard.id }
+        if showCustom { return CustomizationCard.id }
         return showTimer ? TimerCard.id : AboutCard.id
     }
 
     var body: some View {
         Group {
-            if openPuzzle != nil || showAbout || showTimer || showAlgos {
+            if openPuzzle != nil || showAbout || showTimer || showAlgos || showAo5 || showCustom || showCalibrate || showInputLog {
                 openContent
                     .background(
                         // The tapped card grows into this tinted full-screen panel.
@@ -148,7 +182,8 @@ struct ContentView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { _ in touchBegan() }
-                            .onEnded { _ in touchEnded() }
+                            .onEnded { _ in touchEnded() },
+                        including: gesturesOff ? .subviews : .all
                     )
                     // Rightward swipe that starts at the left edge also closes.
                     // Vertical paging and taps are unaffected.
@@ -158,9 +193,19 @@ struct ContentView: View {
                                 if g.startLocation.x < 28,
                                    g.translation.width > 50,
                                    abs(g.translation.height) < 40 { close() }
-                            }
+                            },
+                        including: gesturesOff ? .subviews : .all
                     )
-                    .overlay(alignment: .topLeading) { closeButton }
+                    .overlay(alignment: .leading) {
+                        if gesturesOff {
+                            // Narrow edge strip only, so rows are never covered.
+                            Color.clear.frame(width: 10).contentShape(Rectangle())
+                                .gesture(DragGesture(minimumDistance: 20).onEnded { g in
+                                    if g.translation.width > 50, abs(g.translation.height) < 40 { close() }
+                                })
+                        }
+                    }
+                    .overlay(alignment: .topLeading) { closeButton.allowsHitTesting(!gesturesOff) }
                     .environment(\.closeShown, showClose)
                     .transition(.opacity)
             } else {
@@ -173,6 +218,14 @@ struct ContentView: View {
                     withAnimation(Self.spring) { showTimer = true }
                 }, onAlgos: {
                     withAnimation(Self.spring) { showAlgos = true }
+                }, onAo5: {
+                    withAnimation(Self.spring) { showAo5 = true }
+                }, onCalibrate: {
+                    withAnimation(Self.spring) { showCalibrate = true }
+                }, onInputLog: {
+                    withAnimation(Self.spring) { showInputLog = true }
+                }, onCustomize: {
+                    withAnimation(Self.spring) { showCustom = true }
                 })
                 .transition(.opacity)
             }
@@ -184,6 +237,10 @@ struct ContentView: View {
             guard let target = ComplicationTarget(deepLink: url) else { return }
             showAbout = false
             showAlgos = false
+            showAo5 = false
+            showCustom = false
+            showCalibrate = false
+            showInputLog = false
             if let target = target.puzzle {
                 puzzle = target
                 showTimer = false
@@ -209,6 +266,11 @@ private struct CardStack: View {
     let onAbout: () -> Void
     let onTimer: () -> Void
     let onAlgos: () -> Void
+    let onAo5: () -> Void
+    let onCalibrate: () -> Void
+    let onInputLog: () -> Void
+    @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
+    let onCustomize: () -> Void
 
     private let cardHeight: CGFloat = 84
     private let frontCardHeight: CGFloat = 104
@@ -327,8 +389,6 @@ private struct CardStack: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Algorithms")
                         .font(.system(size: 20, weight: .bold))
-                        .minimumScaleFactor(0.8)
-                        .lineLimit(1)
                     Text("OLL · PLL practice")
                         .font(.caption2)
                         .opacity(0.8)
@@ -372,6 +432,186 @@ private struct CardStack: View {
         .accessibilityLabel("Algorithms")
     }
 
+    private var ao5Card: some View {
+        Button(action: onAo5) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ao5")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Average of 5")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "5.square")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [Ao5Card.color, Ao5Card.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: Ao5Card.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Ao5, average of 5")
+    }
+
+    private var calibrateCard: some View {
+        Button(action: onCalibrate) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Calibrate")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Debug")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "scope")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [CalibrateCard.color, CalibrateCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: CalibrateCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Calibrate, debug crown measurement")
+    }
+
+    private var inputLogCard: some View {
+        Button(action: onInputLog) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Input log")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Debug taps")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [InputLogCard.color, InputLogCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: InputLogCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Input log, debug")
+    }
+
+    private var customizeCard: some View {
+        Button(action: onCustomize) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Customization")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Settings")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "gearshape")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [CustomizationCard.color, CustomizationCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: CustomizationCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Customization, settings")
+    }
+
     var body: some View {
         // Crown / touch scrolls the stack. Cards are laid out vertically with
         // real spacing (no overlap, every title and picture stays visible);
@@ -379,7 +619,7 @@ private struct CardStack: View {
         // nears the top or bottom edge.
         ScrollView {
             VStack(spacing: gap) {
-                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, Algorithms, About
+                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, Algorithms, Ao5, Customization, About
                 // (last, smallest and quietest).
                 ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
                     Button {
@@ -430,6 +670,9 @@ private struct CardStack: View {
                 }
                 timerCard
                 algosCard
+                ao5Card
+                if debug { calibrateCard; inputLogCard }
+                customizeCard
                 aboutCard
             }
             .padding(.horizontal, 4)

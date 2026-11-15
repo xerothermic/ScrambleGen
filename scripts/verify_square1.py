@@ -8,6 +8,8 @@ and must stay legal there too: a turn must leave boundaries on both slice
 lines (0 and 6) of both layers, and the pieces must always tile 12 cells
 with 8 two-cell corners and 8 one-cell edges between them.
 
+Also checks that the shape is cube shape after each of the first six slices.
+
 Also checks the token format the watch UI relies on: one token per slice,
 no token wider than 8 characters, and a (0,0) turn only as the opening
 bare "/".
@@ -40,18 +42,46 @@ def slice_(joined):
         joined[6 + i], joined[12 + i] = joined[12 + i], joined[6 + i]
 
 
-def generate(slices, rng):
+def is_cube(joined):
+    for layer in (joined[:12], joined[12:]):
+        starts = [i for i in range(12) if not layer[(i - 1) % 12]]
+        widths = [((starts[(k + 1) % len(starts)] - s) % 12) or 12 for k, s in enumerate(starts)]
+        if widths.count(2) != 4 or any(widths[k] == widths[(k + 1) % len(widths)]
+                                       for k in range(len(widths))):
+            return False
+    return True
+
+
+CUBE_SHAPE_SLICES = 6
+
+
+def generate(slices, rng, shapes=None):
     joined = SOLVED[:]
     tokens = []
     while len(tokens) < max(0, slices):
-        top, bottom = rng.randint(-5, 6), rng.randint(-5, 6)
+        if len(tokens) < CUBE_SHAPE_SLICES:
+            options = []
+            for t in range(-5, 7):
+                for b in range(-5, 7):
+                    if (t or b or not tokens):
+                        trial = joined[:]
+                        if turn(trial, t, b):
+                            slice_(trial)
+                            if is_cube(trial):
+                                options.append((t, b))
+            top, bottom = rng.choice(options)
+        else:
+            top, bottom = rng.randint(-5, 6), rng.randint(-5, 6)
+            if not (top or bottom):
+                continue
+            if not turn(joined[:], top, bottom):
+                continue
         is_turn = top != 0 or bottom != 0
-        if not (is_turn or not tokens):
-            continue
-        if not turn(joined, top, bottom):
-            continue
+        assert turn(joined, top, bottom)
         slice_(joined)
         tokens.append(f"({top},{bottom})/" if is_turn else "/")
+        if len(tokens) <= CUBE_SHAPE_SLICES:
+            assert is_cube(joined), f"slice {len(tokens)} left cube shape: {tokens}"
     return tokens
 
 
@@ -121,6 +151,67 @@ for slices in list(range(0, 31)) * 700:
     assert len(tokens) == slices, (slices, len(tokens))
     replay(tokens)
     runs += 1
+
+# first six slices stay in cube shape; later ones eventually leave it
+left = 0
+for _ in range(500):
+    j = SOLVED[:]
+    toks = generate(15, rng)
+    for k, tok in enumerate(toks):
+        m = TOKEN.match(tok)
+        x, y = (int(m.group(1)), int(m.group(2))) if m.group(1) else (0, 0)
+        assert turn(j, x, y); slice_(j)
+        if k < 6:
+            assert is_cube(j)
+        elif not is_cube(j):
+            left += 1
+            break
+assert left > 100, f"scrambles never leave cube shape after slice 6 ({left})"
+
+# Piece-id replay (Square1State in Square1MapView.swift): derive the shape of
+# each layer from which cells hold the same piece id, and require cube shape
+# (corner, edge, corner, edge, ...) after every one of the first six slices.
+def piece_shape_is_cube(p):
+    for layer in (p[:12], p[12:]):
+        # a corner = two equal neighbouring ids; walk the ring from a boundary
+        first = next(i for i in range(12) if layer[i] != layer[(i - 1) % 12])
+        kinds, i = [], first
+        while i < first + 12:
+            if layer[i % 12] == layer[(i + 1) % 12]:
+                kinds.append("C"); i += 2
+            else:
+                kinds.append("E"); i += 1
+        if kinds.count("C") != 4 or kinds.count("E") != 4:
+            return False
+        if any(kinds[k] == kinds[(k + 1) % 8] for k in range(8)):
+            return False
+    return True
+
+
+def replay_pieces(tokens):
+    p = [0, 0, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15]
+    shapes = []
+    for tok in tokens:
+        m = TOKEN.match(tok)
+        x, y = (int(m.group(1)), int(m.group(2))) if m.group(1) else (0, 0)
+        up, down = p[:12], p[12:]
+        for i in range(12):
+            p[i] = up[(-x % 12 + i) % 12]
+            p[12 + i] = down[(-y % 12 + i) % 12]
+        for i in range(6):
+            p[6 + i], p[12 + i] = p[12 + i], p[6 + i]
+        shapes.append(piece_shape_is_cube(p))
+    return shapes
+
+
+assert piece_shape_is_cube([0, 0, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15])
+rng2 = random.Random(11)
+later_noncube = 0
+for _ in range(5000):
+    sh = replay_pieces(generate(15, rng2))
+    assert all(sh[:6]), f"left cube shape within the first six slices: {sh}"
+    later_noncube += not all(sh[6:])
+assert later_noncube > 1000, later_noncube
 
 sample = generate(15, random.Random(7))
 print(f"verified {runs} scrambles (0-30 slices); sample: {' '.join(sample)}")
