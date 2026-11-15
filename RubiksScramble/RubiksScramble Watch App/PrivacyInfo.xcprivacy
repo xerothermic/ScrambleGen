@@ -12,7 +12,9 @@
 	<array>
 		<!-- @AppStorage("puzzle") in ContentView.swift (last-viewed puzzle) and
 		     @AppStorage("timerCountdown") in TimerView.swift (inspection
-		     seconds), read and written only by this app. -->
+		     seconds), "motionInsights" and the solve-history flags, read and written only by
+		     this app. Solve history and motion files are plain files in Application
+		     Support (no timestamp/disk-space APIs). -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
