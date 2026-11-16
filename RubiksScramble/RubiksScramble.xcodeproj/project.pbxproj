@@ -26,6 +26,7 @@
 		BB000000000000000000000A /* RubiksScramble Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000006 /* RubiksScramble Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA0000000000000000000023 /* PuzzleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000022 /* PuzzleStyle.swift */; };
 		CC0000000000000000000011 /* ScrambleWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000001 /* ScrambleWidget.swift */; };
+		CC0000000000000000000C02 /* ClockScrambler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000C01 /* ClockScrambler.swift */; };
 		CC0000000000000000000012 /* ScrambleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000014 /* ScrambleGenerator.swift */; };
 		CC0000000000000000000013 /* CubeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000018 /* CubeState.swift */; };
 		CC0000000000000000000014 /* Square1Scrambler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001C /* Square1Scrambler.swift */; };
@@ -355,6 +356,7 @@
 			files = (
 				CC0000000000000000000011 /* ScrambleWidget.swift in Sources */,
 				CC0000000000000000000012 /* ScrambleGenerator.swift in Sources */,
+				CC0000000000000000000C02 /* ClockScrambler.swift in Sources */,
 				CC0000000000000000000013 /* CubeState.swift in Sources */,
 				CC0000000000000000000014 /* Square1Scrambler.swift in Sources */,
 				CC0000000000000000000015 /* PuzzleStyle.swift in Sources */,
