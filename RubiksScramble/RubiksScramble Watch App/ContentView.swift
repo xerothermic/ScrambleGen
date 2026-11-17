@@ -48,6 +48,8 @@ struct ContentView: View {
     @State private var showClose = false
     @State private var touching = false
     @State private var hideTask: Task<Void, Never>?
+    /// The Algorithms card has a sub-screen open: Back, not close, owns the corner.
+    @State private var algoNested = false
 
     private static let spring = Animation.spring(response: 0.45, dampingFraction: 0.82)
 
@@ -99,7 +101,7 @@ struct ContentView: View {
                        page: Binding(get: { pages[open] ?? 0 },
                                      set: { pages[open] = $0 }))
         } else if showAlgos {
-            AlgoScreen()
+            AlgoScreen(nested: $algoNested)
         } else if showTimer {
             TimerScreen(solves: $timerSolves)
         } else if showAo5 {
@@ -133,7 +135,7 @@ struct ContentView: View {
                 .frame(width: 36, height: 36)
                 .padding(.leading, padL)
                 .padding(.top, padT)
-                .opacity(showClose ? 1 : 0)
+                .opacity(showClose && !(showAlgos && algoNested) ? 1 : 0)
                 // Large hit area (>= 64 pt) anchored at the corner.
                 .frame(width: 36 + padL + 24, height: 36 + padT + 24,
                        alignment: .topLeading)
@@ -191,7 +193,7 @@ struct ContentView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 20)
                             .onEnded { g in
-                                if g.startLocation.x < 28,
+                                if !(showAlgos && algoNested), g.startLocation.x < 28,
                                    g.translation.width > 50,
                                    abs(g.translation.height) < 40 { close() }
                             },
@@ -206,8 +208,10 @@ struct ContentView: View {
                                 })
                         }
                     }
-                    .overlay(alignment: .topLeading) { closeButton.allowsHitTesting(!gesturesOff) }
-                    .environment(\.closeShown, showClose)
+                    .overlay(alignment: .topLeading) {
+                        closeButton.allowsHitTesting(!gesturesOff && !(showAlgos && algoNested))
+                    }
+                    .environment(\.closeShown, showClose && !(showAlgos && algoNested))
                     .transition(.opacity)
             } else {
                 CardStack(lastUsed: puzzle, space: cardSpace, onPick: { option in

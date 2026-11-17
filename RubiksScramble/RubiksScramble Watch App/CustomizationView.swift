@@ -22,7 +22,7 @@ enum GeneralSettings {
     /// Orientation pill above the scramble ("White top · Green front" for 3x3,
     /// the notation hints for Square-1 and Clock). Shared by all puzzles.
     static let hintKey = "scramble.orientationHint"
-    static let defaultHint = true
+    static let defaultHint = false
 }
 
 enum Ao5Settings {

@@ -22,6 +22,11 @@ private func play(_ type: WKHapticType) {
 /// The Algorithms card: mode menu (Drill, Practice, Learn, Quiz, Cases,
 /// Progress) plus the case-set filter.
 struct AlgoScreen: View {
+    /// True while a sub-screen is open (Drill, Learn, ...). The card's floating
+    /// close button and edge-swipe close then stand down, so the navigation
+    /// Back button is the only control in the corner; at the top level the
+    /// card's close button exits to the cards.
+    @Binding var nested: Bool
     @StateObject private var store = AlgoStore()
     @AppStorage(AlgoCardInfo.filterKey) private var filter: AlgoSet = .all
     @AppStorage(AlgoCardInfo.inverseBonusKey) private var inverseBonus = true
@@ -105,6 +110,8 @@ struct AlgoScreen: View {
                 }
             }
             .navigationDestination(item: $route) { destination($0) }
+            .onChange(of: route) { _, r in nested = r != nil }
+            .onDisappear { nested = false }
             .modifier(CloseAwareTitle(title: "Algorithms"))
         }
         .environmentObject(store)
