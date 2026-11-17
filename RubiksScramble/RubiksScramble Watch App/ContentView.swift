@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 private struct CloseShownKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
@@ -802,13 +803,24 @@ private struct ScrambleScreen: View {
         return Double(length - r.lowerBound) / Double(r.upperBound - r.lowerBound)
     }
 
+    /// 3x3 moves per row for this screen. A row of n moves is 3n-1 monospaced
+    /// characters at 19 pt (about 11.4 pt each); keep 18 pt spare for the edges.
+    /// 40 mm (162 pt): 144 pt -> 4 per row (125 pt; 5 would need 160).
+    /// 41 mm (176): 4. 44 mm (184) and 45 mm (198): 5 (160 pt).
+    private static var cubeMovesPerRow: Int {
+        let avail = WKInterfaceDevice.current().screenBounds.width - 18
+        let charWidth = 19.0 * 0.6
+        let n = Int(((avail / charWidth) + 1) / 3)
+        return min(5, max(2, n))
+    }
+
     /// Group moves into fixed-width rows so the wrap doesn't shift based on
     /// which moves happen to be short. Every token is padded to its puzzle's
     /// widest move — 2 chars for 3×3 (`R'`), 8 for Square-1 (`(-5,-5)/`) —
     /// and each row holds as many as fit across the smallest watch.
     private var scrambleRows: String {
         let (width, perRow) = switch puzzle {
-        case .cube3x3: (2, 5)
+        case .cube3x3: (2, Self.cubeMovesPerRow)
         case .square1: (8, 2)
         case .clock: (5, 3) // `ALL3+`, `UR4+ DR3- DL5-` per row
         }

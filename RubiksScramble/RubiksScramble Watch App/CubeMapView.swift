@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 /// 2D unfolded "net" of the cube after the scramble is applied:
 ///
@@ -8,7 +9,15 @@ import SwiftUI
 struct CubeMapView: View {
     let moves: [String]
 
-    private let cell: CGFloat = 13
+    /// Sticker size, shrunk to fit the screen width: the net is 4 faces wide, so
+    /// width = 4*(3*cell + 2*gap) + 3*faceGap + 2*padding. With 10 pt spare
+    /// for the screen edge: 40 mm (162 pt) -> 10, 41 mm (176) -> 11,
+    /// 44 mm (184) -> 12, 45 mm (198) and up -> 13 (the old fixed size).
+    private var cell: CGFloat {
+        let screen = WKInterfaceDevice.current().screenBounds.width
+        let fixed = 4 * 2 * stickerGap + 3 * faceGap + 12
+        return min(13, max(6, ((screen - 10 - fixed) / 12).rounded(.down)))
+    }
     private let stickerGap: CGFloat = 1
     private let faceGap: CGFloat = 3
 
