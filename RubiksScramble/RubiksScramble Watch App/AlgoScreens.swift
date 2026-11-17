@@ -40,9 +40,15 @@ struct AlgoScreen: View {
                             _ symbol: String) -> some View {
         Button { route = r; play(.click) } label: {
             menuRow(title, sub, symbol)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.12)))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
         }
+        // Same recipe as bigButton (Drill/Practice), whose taps work: a plain
+        // style with an explicit hit shape, instead of the default list-row button.
+        .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
     }
 
     private func bigButton(_ r: Route, _ title: String, _ sub: String,
