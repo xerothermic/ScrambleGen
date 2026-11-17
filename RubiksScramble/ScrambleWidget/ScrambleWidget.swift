@@ -15,6 +15,7 @@ extension ComplicationTarget: AppEnum {
     static var caseDisplayRepresentations: [ComplicationTarget: DisplayRepresentation] {
         [.cube3x3: DisplayRepresentation(title: "3×3"),
          .square1: DisplayRepresentation(title: "Square-1"),
+         .clock: DisplayRepresentation(title: "Clock"),
          .timer: DisplayRepresentation(title: "Timer")]
     }
 }
@@ -65,6 +66,7 @@ struct PuzzleProvider: AppIntentTimelineProvider {
             switch target {
             case .cube3x3: label = "3×3 Cube"
             case .square1: label = "Square-1"
+            case .clock: label = "Clock"
             case .timer: label = "Timer"
             }
             return AppIntentRecommendation(intent: SelectPuzzleIntent(puzzle: target),
@@ -141,6 +143,7 @@ struct ScrambleComplicationView: View {
         switch puzzle {
         case .cube3x3: return "3×3 Cube"
         case .square1: return "Square-1"
+        case .clock: return "Clock"
         case .timer: return "Timer"
         }
     }

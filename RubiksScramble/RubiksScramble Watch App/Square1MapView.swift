@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 /// Piece-level Square-1 state in the cell model of the WCA's TNoodle
 /// scrambler: cells 0–11 are the top layer and 12–23 the bottom, each holding
@@ -187,4 +188,59 @@ enum Square1Drawing {
 
 #Preview {
     Square1MapView(moves: Square1Scrambler.generate())
+}
+
+
+/// Both faces of the clock after the scramble: nine dials each, hand at the
+/// clock's hour. Front first, then the back (the side the scramble ends on).
+struct ClockMapView: View {
+    let moves: [String]
+
+    private var dialSize: CGFloat {
+        let screen = WKInterfaceDevice.current().screenBounds.width
+        return min(32, ((screen - 24 - 2 * 4) / 3).rounded(.down))
+    }
+
+    var body: some View {
+        let state = ClockState.scrambled(by: moves)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 6) {
+                    face("Front", state.front)
+                    face("Back", state.backFace)
+                }
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity)
+            }
+            .modifier(CloseAwareTitle(title: "Clock"))
+        }
+    }
+
+    private func face(_ title: String, _ hours: [Int]) -> some View {
+        VStack(spacing: 2) {
+            Text(title).font(.caption2).foregroundStyle(.secondary)
+            VStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { r in
+                    HStack(spacing: 4) {
+                        ForEach(0..<3, id: \.self) { c in dial(hours[r * 3 + c]) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func dial(_ hour: Int) -> some View {
+        let s = dialSize
+        return ZStack {
+            Circle().fill(Color.white.opacity(0.9))
+            Circle().stroke(Color.black.opacity(0.35), lineWidth: 1)
+            Capsule()
+                .fill(Color.black)
+                .frame(width: 2.5, height: s * 0.4)
+                .offset(y: -s * 0.2)
+                .rotationEffect(.degrees(Double(hour) * 30))
+            Circle().fill(Color.black).frame(width: 4, height: 4)
+        }
+        .frame(width: s, height: s)
+    }
 }

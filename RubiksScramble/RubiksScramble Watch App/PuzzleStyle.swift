@@ -9,6 +9,7 @@ extension Puzzle {
         switch self {
         case .cube3x3: Color(red: 0.19, green: 0.82, blue: 0.35)  // cube green
         case .square1: Color(red: 0.81, green: 0.13, blue: 0.16)  // WCA front red
+        case .clock: Color(red: 0.0, green: 0.51, blue: 1.0)      // WCA blue
         }
     }
 
@@ -17,6 +18,7 @@ extension Puzzle {
         switch self {
         case .cube3x3: "cube.fill"
         case .square1: "square.split.diagonal"
+        case .clock: "clock"
         }
     }
 
@@ -25,6 +27,7 @@ extension Puzzle {
         switch self {
         case .cube3x3: "3×3"
         case .square1: "Sq-1"
+        case .clock: "Clk"
         }
     }
 
@@ -33,6 +36,7 @@ extension Puzzle {
         switch self {
         case .cube3x3: "3x3"
         case .square1: "square1"
+        case .clock: "clock"
         }
     }
 
@@ -56,12 +60,14 @@ extension Puzzle {
 enum ComplicationTarget: String, CaseIterable {
     case cube3x3
     case square1
+    case clock
     case timer
 
     init(_ puzzle: Puzzle) {
         switch puzzle {
         case .cube3x3: self = .cube3x3
         case .square1: self = .square1
+        case .clock: self = .clock
         }
     }
 

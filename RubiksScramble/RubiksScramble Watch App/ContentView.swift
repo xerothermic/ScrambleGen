@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 private struct CloseShownKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
@@ -30,7 +31,13 @@ struct ContentView: View {
     // nil = the Wallet-style card stack; otherwise the open puzzle.
     @State private var openPuzzle: Puzzle?
     @State private var showAbout = false
-    @State private var showTimer = false
+    // Reopens on the Timer card when a run was in progress at relaunch.
+    @State private var showTimer = TimerCard.hasActiveRun
+    @State private var showAlgos = false
+    @State private var showAo5 = false
+    @State private var showCustom = false
+    @State private var showCalibrate = false   // Calibrate card (debug tool)
+    @State private var showInputLog = false    // Input log card (debug tool)
     // Timer solve times; outlive the card being closed and are restored from
     // UserDefaults when the app is relaunched.
     @State private var timerSolves: [TimeInterval] = TimerCard.loadSolves()
@@ -41,13 +48,16 @@ struct ContentView: View {
     @State private var showClose = false
     @State private var touching = false
     @State private var hideTask: Task<Void, Never>?
+    /// The Algorithms card has a sub-screen open: Back, not close, owns the corner.
+    @State private var algoNested = false
 
     private static let spring = Animation.spring(response: 0.45, dampingFraction: 0.82)
 
     private func close() {
         hideTask?.cancel()
         showClose = false
-        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false }
+        algoNested = false
+        withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAlgos = false; showAo5 = false; showCustom = false; showCalibrate = false; showInputLog = false }
     }
 
     private func scheduleHide() {
@@ -62,13 +72,32 @@ struct ContentView: View {
     private func touchBegan() {
         guard !touching else { return }
         touching = true
+        DebugLog.log("drag start")
         hideTask?.cancel()
         withAnimation(.easeIn(duration: 0.15)) { showClose = true }
     }
 
     private func touchEnded() {
         touching = false
+        DebugLog.log("drag end")
         scheduleHide()
+    }
+
+    /// Screens that contain Lists/NavigationLinks/Buttons do not get the
+    /// container-wide drag gestures (they may swallow row taps on device);
+    /// they close via this toolbar button or the left-edge strip instead.
+    private var gesturesOff: Bool { showCustom || showInputLog || algoSubScreen }
+
+    /// An Algorithms sub-screen is open: the navigation Back button owns the
+    /// top-left corner, so the card-wide touch gestures (which can swallow
+    /// taps on device) and the close affordances all stand down.
+    private var algoSubScreen: Bool { showAlgos && algoNested }
+
+    @ToolbarContentBuilder
+    private var closeToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button { DebugLog.log("tap close"); close() } label: { Image(systemName: "xmark") }
+        }
     }
 
     @ViewBuilder
@@ -77,8 +106,18 @@ struct ContentView: View {
             PuzzlePage(puzzle: open, lengths: $lengths, moves: $moves,
                        page: Binding(get: { pages[open] ?? 0 },
                                      set: { pages[open] = $0 }))
+        } else if showAlgos {
+            AlgoScreen(nested: $algoNested)
         } else if showTimer {
             TimerScreen(solves: $timerSolves)
+        } else if showAo5 {
+            NavigationStack { Ao5Screen() }
+        } else if showCalibrate {
+            NavigationStack { CalibrateScreen() }
+        } else if showInputLog {
+            NavigationStack { InputLogScreen().toolbar { closeToolbar } }
+        } else if showCustom {
+            NavigationStack { CustomizationScreen().toolbar { closeToolbar } }
         } else {
             AboutView()
         }
@@ -102,7 +141,7 @@ struct ContentView: View {
                 .frame(width: 36, height: 36)
                 .padding(.leading, padL)
                 .padding(.top, padT)
-                .opacity(showClose ? 1 : 0)
+                .opacity(showClose && !algoSubScreen ? 1 : 0)
                 // Large hit area (>= 64 pt) anchored at the corner.
                 .frame(width: 36 + padL + 24, height: 36 + padT + 24,
                        alignment: .topLeading)
@@ -115,19 +154,36 @@ struct ContentView: View {
         .ignoresSafeArea()
     }
 
+    /// Tint and matched-geometry id of the open card's full-screen panel.
+    private var panelColor: Color {
+        if let open = openPuzzle { return open.cardColor }
+        if showAlgos { return AlgoCardInfo.color }
+        if showAo5 { return Ao5Card.color }
+        if showCalibrate { return CalibrateCard.color }
+        if showInputLog { return InputLogCard.color }
+        if showCustom { return CustomizationCard.color }
+        return showTimer ? TimerCard.color : AboutCard.color
+    }
+
+    private var panelID: String {
+        if let open = openPuzzle { return open.rawValue }
+        if showAlgos { return AlgoCardInfo.id }
+        if showAo5 { return Ao5Card.id }
+        if showCalibrate { return CalibrateCard.id }
+        if showInputLog { return InputLogCard.id }
+        if showCustom { return CustomizationCard.id }
+        return showTimer ? TimerCard.id : AboutCard.id
+    }
+
     var body: some View {
         Group {
-            if openPuzzle != nil || showAbout || showTimer {
+            if openPuzzle != nil || showAbout || showTimer || showAlgos || showAo5 || showCustom || showCalibrate || showInputLog {
                 openContent
                     .background(
                         // The tapped card grows into this tinted full-screen panel.
                         RoundedRectangle(cornerRadius: 18)
-                            .fill((openPuzzle?.cardColor
-                                   ?? (showTimer ? TimerCard.color : AboutCard.color))
-                                .opacity(0.35))
-                            .matchedGeometryEffect(id: openPuzzle?.rawValue
-                                                   ?? (showTimer ? TimerCard.id : AboutCard.id),
-                                                   in: cardSpace)
+                            .fill(panelColor.opacity(0.35))
+                            .matchedGeometryEffect(id: panelID, in: cardSpace)
                             .ignoresSafeArea()
                     )
                     // Any touch reveals the close button. simultaneousGesture
@@ -135,20 +191,33 @@ struct ContentView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { _ in touchBegan() }
-                            .onEnded { _ in touchEnded() }
+                            .onEnded { _ in touchEnded() },
+                        including: gesturesOff ? .subviews : .all
                     )
                     // Rightward swipe that starts at the left edge also closes.
                     // Vertical paging and taps are unaffected.
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 20)
                             .onEnded { g in
-                                if g.startLocation.x < 28,
+                                if !algoSubScreen, g.startLocation.x < 28,
                                    g.translation.width > 50,
                                    abs(g.translation.height) < 40 { close() }
-                            }
+                            },
+                        including: gesturesOff ? .subviews : .all
                     )
-                    .overlay(alignment: .topLeading) { closeButton }
-                    .environment(\.closeShown, showClose)
+                    .overlay(alignment: .leading) {
+                        if gesturesOff && !algoSubScreen {
+                            // Narrow edge strip only, so rows are never covered.
+                            Color.clear.frame(width: 10).contentShape(Rectangle())
+                                .gesture(DragGesture(minimumDistance: 20).onEnded { g in
+                                    if g.translation.width > 50, abs(g.translation.height) < 40 { close() }
+                                })
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        closeButton.allowsHitTesting(!gesturesOff && !algoSubScreen)
+                    }
+                    .environment(\.closeShown, showClose && !algoSubScreen)
                     .transition(.opacity)
             } else {
                 CardStack(lastUsed: puzzle, space: cardSpace, onPick: { option in
@@ -158,6 +227,16 @@ struct ContentView: View {
                     withAnimation(Self.spring) { showAbout = true }
                 }, onTimer: {
                     withAnimation(Self.spring) { showTimer = true }
+                }, onAlgos: {
+                    withAnimation(Self.spring) { showAlgos = true }
+                }, onAo5: {
+                    withAnimation(Self.spring) { showAo5 = true }
+                }, onCalibrate: {
+                    withAnimation(Self.spring) { showCalibrate = true }
+                }, onInputLog: {
+                    withAnimation(Self.spring) { showInputLog = true }
+                }, onCustomize: {
+                    withAnimation(Self.spring) { showCustom = true }
                 })
                 .transition(.opacity)
             }
@@ -168,6 +247,11 @@ struct ContentView: View {
         .onOpenURL { url in
             guard let target = ComplicationTarget(deepLink: url) else { return }
             showAbout = false
+            showAlgos = false
+            showAo5 = false
+            showCustom = false
+            showCalibrate = false
+            showInputLog = false
             if let target = target.puzzle {
                 puzzle = target
                 showTimer = false
@@ -192,6 +276,13 @@ private struct CardStack: View {
     let onPick: (Puzzle) -> Void
     let onAbout: () -> Void
     let onTimer: () -> Void
+    let onAlgos: () -> Void
+    let onAo5: () -> Void
+    let onCalibrate: () -> Void
+    let onInputLog: () -> Void
+    @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
+    @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
+    let onCustomize: () -> Void
 
     private let cardHeight: CGFloat = 84
     private let frontCardHeight: CGFloat = 104
@@ -304,6 +395,235 @@ private struct CardStack: View {
         .accessibilityLabel("Timer")
     }
 
+    private var algosCard: some View {
+        Button(action: onAlgos) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Algorithms")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("OLL · PLL practice")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                // Last-layer top view of a Sune (OLL 27).
+                Canvas { context, size in
+                    AlgoArt.drawOLL(&context, origin: .zero, side: min(size.width, size.height),
+                                    bits: "010111110100100001000")
+                }
+                .frame(width: 56, height: 56)
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [AlgoCardInfo.color, AlgoCardInfo.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: AlgoCardInfo.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Algorithms")
+    }
+
+    private var ao5Card: some View {
+        Button(action: onAo5) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ao5")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Average of 5")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "5.square")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [Ao5Card.color, Ao5Card.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: Ao5Card.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Ao5, average of 5")
+    }
+
+    private var calibrateCard: some View {
+        Button(action: onCalibrate) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Calibrate")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Debug")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "scope")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [CalibrateCard.color, CalibrateCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: CalibrateCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Calibrate, debug crown measurement")
+    }
+
+    private var inputLogCard: some View {
+        Button(action: onInputLog) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Input log")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Debug taps")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [InputLogCard.color, InputLogCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: InputLogCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Input log, debug")
+    }
+
+    private var customizeCard: some View {
+        Button(action: onCustomize) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Customization")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("Settings")
+                        .font(.caption2)
+                        .opacity(0.8)
+                    Spacer()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "gearshape")
+                    .font(.system(size: 34, weight: .light))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(
+                        colors: [CustomizationCard.color, CustomizationCard.color.opacity(0.75)],
+                        startPoint: .top, endPoint: .bottom))
+                    .matchedGeometryEffect(id: CustomizationCard.id, in: space)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: -3)
+        }
+        .buttonStyle(.plain)
+        .scrollTransition(axis: .vertical) { content, phase in
+            content
+                .rotation3DEffect(.degrees(phase.value * -12),
+                                  axis: (x: 1, y: 0, z: 0),
+                                  anchor: .center, perspective: 0.6)
+                .scaleEffect(1 - abs(phase.value) * 0.04)
+        }
+        .accessibilityLabel("Customization, settings")
+    }
+
     var body: some View {
         // Crown / touch scrolls the stack. Cards are laid out vertically with
         // real spacing (no overlap, every title and picture stays visible);
@@ -311,9 +631,9 @@ private struct CardStack: View {
         // nears the top or bottom edge.
         ScrollView {
             VStack(spacing: gap) {
-                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, About
+                // Top to bottom: 3x3 (first, tallest), Square-1, Timer, Algorithms, Ao5, Customization, About
                 // (last, smallest and quietest).
-                ForEach(Array(Puzzle.allCases.enumerated()), id: \.element) { index, option in
+                ForEach(Array(Puzzle.allCases.filter { beta || $0 != .clock }.enumerated()), id: \.element) { index, option in
                     Button {
                         onPick(option)
                     } label: {
@@ -361,6 +681,10 @@ private struct CardStack: View {
                     .accessibilityLabel("\(option.name) scramble")
                 }
                 timerCard
+                if beta { algosCard }
+                ao5Card
+                if debug { calibrateCard; inputLogCard }
+                customizeCard
                 aboutCard
             }
             .padding(.horizontal, 4)
@@ -452,8 +776,9 @@ private struct PuzzlePage: View {
             ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
                 .tag(0)
             switch puzzle {
-            case .cube3x3: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
             case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+            case .clock: ClockMapView(moves: moves[puzzle] ?? []).tag(1)
+            default: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
             }
         }
         .tabViewStyle(.verticalPage)
@@ -472,6 +797,7 @@ private struct ScrambleScreen: View {
     private enum FocusField: Hashable { case length }
     @FocusState private var focus: FocusField?
     @State private var isSelected = false
+    @AppStorage(GeneralSettings.hintKey) private var showHint = GeneralSettings.defaultHint
     private var lengthFocused: Bool { isSelected }
 
     private static let topID = "scrambleTop"
@@ -484,12 +810,27 @@ private struct ScrambleScreen: View {
         return Double(length - r.lowerBound) / Double(r.upperBound - r.lowerBound)
     }
 
+    /// 3x3 moves per row for this screen. A row of n moves is 3n-1 monospaced
+    /// characters at 19 pt (about 11.4 pt each); keep 18 pt spare for the edges.
+    /// 40 mm (162 pt): 144 pt -> 4 per row (125 pt; 5 would need 160).
+    /// 41 mm (176): 4. 44 mm (184) and 45 mm (198): 5 (160 pt).
+    private static var cubeMovesPerRow: Int {
+        let avail = WKInterfaceDevice.current().screenBounds.width - 18
+        let charWidth = 19.0 * 0.6
+        let n = Int(((avail / charWidth) + 1) / 3)
+        return min(5, max(2, n))
+    }
+
     /// Group moves into fixed-width rows so the wrap doesn't shift based on
     /// which moves happen to be short. Every token is padded to its puzzle's
     /// widest move — 2 chars for 3×3 (`R'`), 8 for Square-1 (`(-5,-5)/`) —
     /// and each row holds as many as fit across the smallest watch.
     private var scrambleRows: String {
-        let (width, perRow) = puzzle == .cube3x3 ? (2, 5) : (8, 2)
+        let (width, perRow) = switch puzzle {
+        case .cube3x3: (2, Self.cubeMovesPerRow)
+        case .square1: (8, 2)
+        case .clock: (5, 3) // `ALL3+`, `UR4+ DR3- DL5-` per row
+        }
         let padded = (moves[puzzle] ?? []).map {
             (puzzle == .square1 ? Self.aligned($0) : $0)
                 .padding(toLength: width, withPad: " ", startingAt: 0)
@@ -517,20 +858,24 @@ private struct ScrambleScreen: View {
                     // 3×3: the standard WCA scrambling orientation, with the
                     // green pill + white text echoing the two reference faces.
                     // Square-1: how to read the notation.
-                    Text(puzzle == .cube3x3
-                         ? "White top · Green front"
-                         : "(top, bottom) · / = slice")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .minimumScaleFactor(0.8)
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.accentColor))
-                        .id(Self.topID)
+                    if showHint {
+                        Text(puzzle == .cube3x3
+                             ? "White top · Green front"
+                             : puzzle == .clock
+                             ? "12 o'clock up · y2 = flip"
+                             : "(top, bottom) · / = slice")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .minimumScaleFactor(0.8)
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.accentColor))
+                    }
 
                     Text(scrambleRows)
-                        .font(.system(size: puzzle == .cube3x3 ? 19 : 16,
+                        .id(Self.topID)
+                        .font(.system(size: puzzle == .cube3x3 ? 19 : puzzle == .clock ? 14 : 16,
                                       weight: .semibold, design: .monospaced))
                         .multilineTextAlignment(.leading)
                         .minimumScaleFactor(0.7)
@@ -542,68 +887,70 @@ private struct ScrambleScreen: View {
                         .contentShape(Rectangle())
                         .onTapGesture { isSelected = false }
 
-                    // Crown-capture pill. Tap toggles focus (tap the scramble
-                    // notation above also deactivates). No Button — on watchOS, Button taps move
-                    // focus to themselves and would fight with our binding.
-                    VStack(spacing: 5) {
-                        HStack(spacing: 6) {
-                            Image(systemName: lengthFocused
-                                  ? "dial.medium.fill"
-                                  : "dial.medium")
-                            Text("\(puzzle.lengthLabel) \(length)")
-                        }
-                        // Thermometer: count within the puzzle's range.
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill((lengthFocused ? Color.black : Color.white).opacity(0.25))
-                                Capsule()
-                                    .fill(lengthFocused ? Color.black : Color.accentColor)
-                                    .frame(width: max(4, geo.size.width * lengthFraction))
+                    if puzzle.hasLength {
+                        // Crown-capture pill. Tap toggles focus (tap the scramble
+                        // notation above also deactivates). No Button — on watchOS, Button taps move
+                        // focus to themselves and would fight with our binding.
+                        VStack(spacing: 5) {
+                            HStack(spacing: 6) {
+                                Image(systemName: lengthFocused
+                                      ? "dial.medium.fill"
+                                      : "dial.medium")
+                                Text("\(puzzle.lengthLabel) \(length)")
                             }
+                            // Thermometer: count within the puzzle's range.
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill((lengthFocused ? Color.black : Color.white).opacity(0.25))
+                                    Capsule()
+                                        .fill(lengthFocused ? Color.black : Color.accentColor)
+                                        .frame(width: max(4, geo.size.width * lengthFraction))
+                                }
+                            }
+                            .frame(height: 4)
                         }
-                        .frame(height: 4)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(lengthFocused ? Color.black : Color.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
+                        .background(
+                            Capsule().fill(lengthFocused
+                                           ? Color.accentColor
+                                           : Color.gray.opacity(0.30))
+                        )
+                        .contentShape(Capsule())
+                        .focusable(isSelected)
+                        .focused($focus, equals: .length)
+                        // Tap toggles: first tap selects (crown adjusts the
+                        // count), second tap deselects (crown scrolls the page).
+                        .onTapGesture { isSelected.toggle() }
+                        .sensoryFeedback(.selection, trigger: isSelected)
+                        .onChange(of: isSelected) { _, selected in
+                            // Hand the crown to / take it from the pill. Deferred
+                            // a tick so focusable(true) has been applied first.
+                            Task { @MainActor in focus = selected ? .length : nil }
+                        }
+                        // Focus lost externally (user scrolled the page, swiped
+                        // away): deselect. Only reacts to losing an actual focus,
+                        // so the not-yet-focused moment after selecting is ignored.
+                        .onChange(of: focus) { old, new in
+                            if old == .length, new == nil, isSelected { isSelected = false }
+                        }
+                        .digitalCrownRotation(
+                            $crownLength,
+                            from: Double(puzzle.lengthRange.lowerBound),
+                            through: Double(puzzle.lengthRange.upperBound),
+                            by: 1.0,
+                            sensitivity: .medium,
+                            isContinuous: false,
+                            isHapticFeedbackEnabled: true
+                        )
+                        .onChange(of: crownLength) { _, v in
+                            lengths[puzzle] = Int(v.rounded())
+                        }
+                        .onAppear { crownLength = Double(length) }
                     }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(lengthFocused ? Color.black : Color.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 14)
-                    .background(
-                        Capsule().fill(lengthFocused
-                                       ? Color.accentColor
-                                       : Color.gray.opacity(0.30))
-                    )
-                    .contentShape(Capsule())
-                    .focusable(isSelected)
-                    .focused($focus, equals: .length)
-                    // Tap toggles: first tap selects (crown adjusts the
-                    // count), second tap deselects (crown scrolls the page).
-                    .onTapGesture { isSelected.toggle() }
-                    .sensoryFeedback(.selection, trigger: isSelected)
-                    .onChange(of: isSelected) { _, selected in
-                        // Hand the crown to / take it from the pill. Deferred
-                        // a tick so focusable(true) has been applied first.
-                        Task { @MainActor in focus = selected ? .length : nil }
-                    }
-                    // Focus lost externally (user scrolled the page, swiped
-                    // away): deselect. Only reacts to losing an actual focus,
-                    // so the not-yet-focused moment after selecting is ignored.
-                    .onChange(of: focus) { old, new in
-                        if old == .length, new == nil, isSelected { isSelected = false }
-                    }
-                    .digitalCrownRotation(
-                        $crownLength,
-                        from: Double(puzzle.lengthRange.lowerBound),
-                        through: Double(puzzle.lengthRange.upperBound),
-                        by: 1.0,
-                        sensitivity: .medium,
-                        isContinuous: false,
-                        isHapticFeedbackEnabled: true
-                    )
-                    .onChange(of: crownLength) { _, v in
-                        lengths[puzzle] = Int(v.rounded())
-                    }
-                    .onAppear { crownLength = Double(length) }
 
                     Button {
                         moves[puzzle] = puzzle.generate(length: length)
@@ -622,7 +969,8 @@ private struct ScrambleScreen: View {
 
                     VStack(spacing: 2) {
                         Image(systemName: "chevron.compact.down")
-                        Text(puzzle == .cube3x3 ? "Cube map" : "Square-1 map")
+                        Text(puzzle == .cube3x3 ? "Cube map"
+                             : puzzle == .clock ? "Clock map" : "Square-1 map")
                             .font(.caption2)
                     }
                     .foregroundStyle(.secondary)

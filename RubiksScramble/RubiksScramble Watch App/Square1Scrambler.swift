@@ -37,12 +37,34 @@ struct Square1Shape {
     mutating func slice() {
         for i in 0..<6 { joined.swapAt(6 + i, 12 + i) }
     }
+
+    /// True when both layers alternate corner, edge, corner, edge, ... (four
+    /// corners and four edges each): the starting "cube shape".
+    var isCube: Bool {
+        for base in [0, 12] {
+            var starts: [Int] = []
+            for i in 0..<12 where !joined[base + (i + 11) % 12] { starts.append(i) }
+            var widths: [Int] = []
+            for (k, start) in starts.enumerated() {
+                let gap = (starts[(k + 1) % starts.count] - start + 12) % 12
+                widths.append(gap == 0 ? 12 : gap)
+            }
+            if widths.filter({ $0 == 2 }).count != 4 { return false }
+            for k in 0..<widths.count where widths[k] == widths[(k + 1) % widths.count] { return false }
+        }
+        return true
+    }
 }
 
 /// Random-move Square-1 scrambles in WCA notation: `(x,y)/` turns the top
 /// layer x and the bottom layer y steps of 30°, then slices.
+///
+/// The first `cubeShapeSlices` slices are chosen so the puzzle is back in cube
+/// shape after each of them (uniform over the legal turns that do that);
+/// from the next slice on, any legal turn is allowed.
 enum Square1Scrambler {
     static let defaultSlices = 15
+    static let cubeShapeSlices = 6
 
     /// One token per slice. A scramble may open with a bare `/`; anywhere
     /// else a (0,0) turn would just undo the previous slice.
@@ -51,10 +73,30 @@ enum Square1Scrambler {
         var tokens: [String] = []
         tokens.reserveCapacity(max(0, slices))
         while tokens.count < max(0, slices) {
-            let top = Int.random(in: -5...6)
-            let bottom = Int.random(in: -5...6)
+            var top: Int
+            var bottom: Int
+            if tokens.count < cubeShapeSlices {
+                var options: [(Int, Int)] = []
+                for t in -5...6 {
+                    for b in -5...6 where t != 0 || b != 0 || tokens.isEmpty {
+                        var trial = shape
+                        if trial.turn(top: t, bottom: b) {
+                            trial.slice()
+                            if trial.isCube { options.append((t, b)) }
+                        }
+                    }
+                }
+                (top, bottom) = options.randomElement()!
+            } else {
+                top = Int.random(in: -5...6)
+                bottom = Int.random(in: -5...6)
+                guard top != 0 || bottom != 0, shape.turn(top: top, bottom: bottom) else { continue }
+                shape.slice()
+                tokens.append("(\(top),\(bottom))/")
+                continue
+            }
             let isTurn = top != 0 || bottom != 0
-            guard isTurn || tokens.isEmpty, shape.turn(top: top, bottom: bottom) else { continue }
+            _ = shape.turn(top: top, bottom: bottom)
             shape.slice()
             tokens.append(isTurn ? "(\(top),\(bottom))/" : "/")
         }
