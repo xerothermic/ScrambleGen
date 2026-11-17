@@ -111,7 +111,6 @@ struct AlgoScreen: View {
             }
             .navigationDestination(item: $route) { destination($0) }
             .onChange(of: route) { _, r in nested = r != nil }
-            .onDisappear { nested = false }
             .modifier(CloseAwareTitle(title: "Algorithms"))
         }
         .environmentObject(store)

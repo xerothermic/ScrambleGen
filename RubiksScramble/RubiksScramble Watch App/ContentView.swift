@@ -56,6 +56,7 @@ struct ContentView: View {
     private func close() {
         hideTask?.cancel()
         showClose = false
+        algoNested = false
         withAnimation(Self.spring) { openPuzzle = nil; showAbout = false; showTimer = false; showAlgos = false; showAo5 = false; showCustom = false; showCalibrate = false; showInputLog = false }
     }
 

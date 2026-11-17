@@ -17,7 +17,8 @@ enum GeneralSettings {
     static let defaultDebug = false
     /// Beta features (Algorithms card, Clock scrambles, Premium history/stats/
     /// motion insights): unpolished, hidden unless this is on.
-    static let betaKey = "beta.enabled"
+    // v2 key: everyone starts with beta off again (a stored "on" under the old key is ignored).
+    static let betaKey = "beta.enabled2"
     static let defaultBeta = false
     /// Orientation pill above the scramble ("White top · Green front" for 3x3,
     /// the notation hints for Square-1 and Clock). Shared by all puzzles.
