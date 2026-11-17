@@ -762,20 +762,16 @@ private struct PuzzlePage: View {
 
     var body: some View {
         // Scramble on top; swipe down for the puzzle's state after it.
-        // Clock has no map page, so it is just the scramble screen.
-        if puzzle == .clock {
+        TabView(selection: $page) {
             ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
-        } else {
-            TabView(selection: $page) {
-                ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
-                    .tag(0)
-                switch puzzle {
-                case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
-                default: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
-                }
+                .tag(0)
+            switch puzzle {
+            case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+            case .clock: ClockMapView(moves: moves[puzzle] ?? []).tag(1)
+            default: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
             }
-            .tabViewStyle(.verticalPage)
         }
+        .tabViewStyle(.verticalPage)
     }
 }
 
@@ -961,15 +957,14 @@ private struct ScrambleScreen: View {
                     }
                     .buttonStyle(.borderedProminent)
 
-                    if puzzle != .clock {
-                        VStack(spacing: 2) {
-                            Image(systemName: "chevron.compact.down")
-                            Text(puzzle == .cube3x3 ? "Cube map" : "Square-1 map")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
+                    VStack(spacing: 2) {
+                        Image(systemName: "chevron.compact.down")
+                        Text(puzzle == .cube3x3 ? "Cube map"
+                             : puzzle == .clock ? "Clock map" : "Square-1 map")
+                            .font(.caption2)
                     }
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
                 }
                 .padding(.horizontal, 4)
             }

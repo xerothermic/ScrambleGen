@@ -30,7 +30,44 @@ LAYOUT = re.compile(
 )
 
 
+PINS = {"UL": [(0, 0)], "UR": [(0, 1)], "DL": [(1, 0)], "DR": [(1, 1)],
+        "U": [(0, 0), (0, 1)], "D": [(1, 0), (1, 1)],
+        "L": [(0, 0), (1, 0)], "R": [(0, 1), (1, 1)],
+        "ALL": [(0, 0), (0, 1), (1, 0), (1, 1)]}
+
+
+def simulate(tokens):
+    """Mirror of ClockState.scrambled: 9 front-view hours (row-major)."""
+    dial = [0] * 9
+    back = False
+    for t in tokens:
+        if t == "y2":
+            back = True
+            continue
+        m = re.match(r"^([A-Z]+)(\d)([+-])$", t)
+        name, n, sign = m.group(1), int(m.group(2)), m.group(3)
+        n = -n if sign == "-" else n
+        hit = set()
+        for r0, c0 in PINS[name]:
+            for r in (r0, r0 + 1):
+                for c in (c0, c0 + 1):
+                    hit.add(r * 3 + (2 - c if back else c))
+        for i in hit:
+            dial[i] = (dial[i] + (-n if back else n)) % 12
+    return dial
+
+
+def check_simulation():
+    assert simulate(["UR1+"]) == [0, 1, 1, 0, 1, 1, 0, 0, 0]
+    assert simulate(["U2-"]) == [10] * 6 + [0] * 3
+    assert simulate(["ALL3+"]) == [3] * 9
+    # Back view: UL pin = back column 0 = front column 2; clockwise from the back.
+    assert simulate(["y2", "UL1+"]) == [0, 11, 11, 0, 11, 11, 0, 0, 0]
+    print("simulation OK")
+
+
 def main():
+    check_simulation()
     rng = random.Random(1)
     values = set()
     for _ in range(20000):
