@@ -7,6 +7,45 @@ enum Ao5Card {
     static let color = Color(red: 0.55, green: 0.25, blue: 0.80)
 }
 
+/// Persists the five Ao5 entries (UserDefaults) so they survive closing the
+/// card and relaunching the app, until the user taps Clear.
+/// Format: five comma-separated fields, each "" (empty slot) or "<millis>:<n|p|d>".
+enum Ao5Store {
+    private static let key = "ao5.entries"
+
+    static func load() -> [Ao5Solve?] {
+        var out = [Ao5Solve?](repeating: nil, count: AverageOfFive.count)
+        guard let raw = UserDefaults.standard.string(forKey: key) else { return out }
+        let fields = raw.split(separator: ",", omittingEmptySubsequences: false)
+        for (i, f) in fields.prefix(out.count).enumerated() {
+            let parts = f.split(separator: ":")
+            guard parts.count == 2, let ms = Int(parts[0]) else { continue }
+            let pen: Ao5Penalty
+            switch parts[1] {
+            case "p": pen = .plus2
+            case "d": pen = .dnf
+            default: pen = .none
+            }
+            out[i] = Ao5Solve(millis: ms, penalty: pen)
+        }
+        return out
+    }
+
+    static func save(_ entries: [Ao5Solve?]) {
+        let raw = entries.map { e -> String in
+            guard let e else { return "" }
+            let c: String
+            switch e.penalty {
+            case .none: c = "n"
+            case .plus2: c = "p"
+            case .dnf: c = "d"
+            }
+            return "\(e.millis):\(c)"
+        }.joined(separator: ",")
+        UserDefaults.standard.set(raw, forKey: key)
+    }
+}
+
 /// Dialled time + pending penalty. Observation tracks per-property reads, so
 /// only the small views that read these re-render on a crown tick; the
 /// Ao5Screen body never reads them (it uses them imperatively).
@@ -165,16 +204,17 @@ private struct Ao5Actions: View {
 /// "Set" stores the dialled time, with the +2 / DNF toggles, in the selected
 /// slot and moves on to the next empty one. The best single and the average
 /// (once all five are set) update live. Nothing is saved; leaving the screen
-/// discards the entries.
+/// "Clear" resets them. The entries are remembered (see `Ao5Store`) after the
+/// card is closed, until the user taps Clear.
 ///
 /// Performance: the dialled value lives in `Ao5Dial` (@Observable) and is read
 /// only by `Ao5DialTime` / `Ao5Actions`, so crown ticks never re-evaluate this
 /// body. The layout fits without a ScrollView so the crown is not contested.
 struct Ao5Screen: View {
     /// The five solves; nil = not set yet.
-    @State private var entries: [Ao5Solve?] = Array(repeating: nil, count: AverageOfFive.count)
-    /// Selected slot (0...4).
-    @State private var selected = 0
+    @State private var entries: [Ao5Solve?] = Ao5Store.load()
+    /// Selected slot (0...4): first empty slot, or 0 when all are set.
+    @State private var selected = Ao5Store.load().firstIndex(where: { $0 == nil }) ?? 0
     @State private var dial = Ao5Dial()
 
     private func select(_ i: Int) {
@@ -194,6 +234,7 @@ struct Ao5Screen: View {
     private func setCurrent() {
         guard dial.canSet else { return }
         entries[selected] = Ao5Solve(millis: dial.millis, penalty: dial.penalty)
+        Ao5Store.save(entries)
         WKInterfaceDevice.current().play(.success)
         // Next empty slot after this one (wrapping); stay put when all are set.
         let n = AverageOfFive.count
@@ -207,6 +248,7 @@ struct Ao5Screen: View {
 
     private func restart() {
         entries = Array(repeating: nil, count: AverageOfFive.count)
+        Ao5Store.save(entries)
         selected = 0
         dial.resetMotion()
         dial.configure(Ao5Settings.load())
@@ -268,7 +310,7 @@ struct Ao5Screen: View {
                         slot(i, dropped: result?.dropped.contains(i) ?? false)
                     }
                     Button { restart() } label: {
-                        Text("New")
+                        Text("Clear")
                             .font(.system(size: 12, weight: .semibold))
                             .frame(maxWidth: .infinity, minHeight: 24)
                             .background(RoundedRectangle(cornerRadius: 6)
@@ -283,6 +325,10 @@ struct Ao5Screen: View {
         .onAppear {
             dial.resetMotion()
             dial.configure(Ao5Settings.load())
+            // Show the remembered time of the selected slot (empty slot: zero).
+            if let s = entries[selected] {
+                dial.set(millis: s.millis, penalty: s.penalty)
+            }
         }
     }
 }
