@@ -185,7 +185,7 @@ private struct AlgoCasePage: View {
 
     private var compact: some View {
         VStack(spacing: 3) {
-            AlgoCaseView(algoCase: algoCase, size: longAlg ? 56 : 72)
+            AlgoCaseView(algoCase: algoCase, size: longAlg ? 48 : 60)
             Text(algoCase.name)
                 .font(.system(size: 15, weight: .bold))
                 .lineLimit(1)
@@ -202,6 +202,13 @@ private struct AlgoCasePage: View {
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.5)
                 .lineLimit(6)
+            // The scramble that sets this case up from solved (full size on the big page).
+            Text("Scramble: " + AlgoText.lines(algoCase.setup, perLine: 6).replacingOccurrences(of: "\n", with: " "))
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.6)
+                .lineLimit(3)
             inverseLine
         }
         .padding(.horizontal, 4)
@@ -213,8 +220,20 @@ private struct AlgoCasePage: View {
                 Text(algoCase.name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
+                Text("Solution")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
                 Text(AlgoText.lines(algoCase.alg, perLine: 3))
                     .font(.system(size: AlgoText.algFontSize(algoCase.alg),
+                                  weight: .semibold, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.6)
+                Text("Scramble")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                Text(AlgoText.lines(algoCase.setup, perLine: 3))
+                    .font(.system(size: AlgoText.algFontSize(algoCase.setup),
                                   weight: .semibold, design: .monospaced))
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.6)
