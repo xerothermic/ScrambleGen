@@ -791,6 +791,7 @@ private struct ScrambleScreen: View {
     private enum FocusField: Hashable { case length }
     @FocusState private var focus: FocusField?
     @State private var isSelected = false
+    @AppStorage(GeneralSettings.hintKey) private var showHint = GeneralSettings.defaultHint
     private var lengthFocused: Bool { isSelected }
 
     private static let topID = "scrambleTop"
@@ -851,21 +852,23 @@ private struct ScrambleScreen: View {
                     // 3×3: the standard WCA scrambling orientation, with the
                     // green pill + white text echoing the two reference faces.
                     // Square-1: how to read the notation.
-                    Text(puzzle == .cube3x3
-                         ? "White top · Green front"
-                         : puzzle == .clock
-                         ? "12 o'clock up · y2 = flip"
-                         : "(top, bottom) · / = slice")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .minimumScaleFactor(0.8)
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.accentColor))
-                        .id(Self.topID)
+                    if showHint {
+                        Text(puzzle == .cube3x3
+                             ? "White top · Green front"
+                             : puzzle == .clock
+                             ? "12 o'clock up · y2 = flip"
+                             : "(top, bottom) · / = slice")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .minimumScaleFactor(0.8)
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.accentColor))
+                    }
 
                     Text(scrambleRows)
+                        .id(Self.topID)
                         .font(.system(size: puzzle == .cube3x3 ? 19 : puzzle == .clock ? 14 : 16,
                                       weight: .semibold, design: .monospaced))
                         .multilineTextAlignment(.leading)

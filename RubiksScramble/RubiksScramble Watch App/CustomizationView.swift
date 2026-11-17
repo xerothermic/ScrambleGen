@@ -19,6 +19,10 @@ enum GeneralSettings {
     /// motion insights): unpolished, hidden unless this is on.
     static let betaKey = "beta.enabled"
     static let defaultBeta = false
+    /// Orientation pill above the scramble ("White top · Green front" for 3x3,
+    /// the notation hints for Square-1 and Clock). Shared by all puzzles.
+    static let hintKey = "scramble.orientationHint"
+    static let defaultHint = true
 }
 
 enum Ao5Settings {
@@ -190,9 +194,17 @@ struct CustomizationScreen: View {
 
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
+    @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
 
     var body: some View {
         Form {
+            Section {
+                Toggle(isOn: $hint) { Text("Orientation hint").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("hint toggle")
+            } header: {
+                sectionHeader("Scramble")
+            }
             Section {
                 TuneRow("Crown speed", value: $step, range: Ao5Settings.stepRange, step: 1)
                 TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
@@ -247,5 +259,6 @@ struct CustomizationScreen: View {
         .onChange(of: feedback) { DebugLog.setting("feedback", $0, $1) }
         .onChange(of: debug) { DebugLog.setting("debug", $0, $1) }
         .onChange(of: beta) { DebugLog.setting("beta", $0, $1) }
+        .onChange(of: hint) { DebugLog.setting("hint", $0, $1) }
     }
 }
