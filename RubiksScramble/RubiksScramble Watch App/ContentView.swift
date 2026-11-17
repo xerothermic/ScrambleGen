@@ -86,7 +86,12 @@ struct ContentView: View {
     /// Screens that contain Lists/NavigationLinks/Buttons do not get the
     /// container-wide drag gestures (they may swallow row taps on device);
     /// they close via this toolbar button or the left-edge strip instead.
-    private var gesturesOff: Bool { showCustom || showInputLog }
+    private var gesturesOff: Bool { showCustom || showInputLog || algoSubScreen }
+
+    /// An Algorithms sub-screen is open: the navigation Back button owns the
+    /// top-left corner, so the card-wide touch gestures (which can swallow
+    /// taps on device) and the close affordances all stand down.
+    private var algoSubScreen: Bool { showAlgos && algoNested }
 
     @ToolbarContentBuilder
     private var closeToolbar: some ToolbarContent {
@@ -136,7 +141,7 @@ struct ContentView: View {
                 .frame(width: 36, height: 36)
                 .padding(.leading, padL)
                 .padding(.top, padT)
-                .opacity(showClose && !(showAlgos && algoNested) ? 1 : 0)
+                .opacity(showClose && !algoSubScreen ? 1 : 0)
                 // Large hit area (>= 64 pt) anchored at the corner.
                 .frame(width: 36 + padL + 24, height: 36 + padT + 24,
                        alignment: .topLeading)
@@ -194,14 +199,14 @@ struct ContentView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 20)
                             .onEnded { g in
-                                if !(showAlgos && algoNested), g.startLocation.x < 28,
+                                if !algoSubScreen, g.startLocation.x < 28,
                                    g.translation.width > 50,
                                    abs(g.translation.height) < 40 { close() }
                             },
                         including: gesturesOff ? .subviews : .all
                     )
                     .overlay(alignment: .leading) {
-                        if gesturesOff {
+                        if gesturesOff && !algoSubScreen {
                             // Narrow edge strip only, so rows are never covered.
                             Color.clear.frame(width: 10).contentShape(Rectangle())
                                 .gesture(DragGesture(minimumDistance: 20).onEnded { g in
@@ -210,9 +215,9 @@ struct ContentView: View {
                         }
                     }
                     .overlay(alignment: .topLeading) {
-                        closeButton.allowsHitTesting(!gesturesOff && !(showAlgos && algoNested))
+                        closeButton.allowsHitTesting(!gesturesOff && !algoSubScreen)
                     }
-                    .environment(\.closeShown, showClose && !(showAlgos && algoNested))
+                    .environment(\.closeShown, showClose && !algoSubScreen)
                     .transition(.opacity)
             } else {
                 CardStack(lastUsed: puzzle, space: cardSpace, onPick: { option in
