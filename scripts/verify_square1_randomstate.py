@@ -37,6 +37,7 @@ from array import array
 N_PERM = 40320
 N_SET = 70
 N_TURN = 144
+NODE_LIMIT = 20_000_000
 FACT = [5040, 720, 120, 24, 6, 2, 1, 1]
 CORNER_CELLS = [0, 3, 6, 9, 12, 15, 18, 21]
 EDGE_CELLS = [2, 5, 8, 11, 14, 17, 20, 23]
@@ -224,7 +225,8 @@ def get_nibble(tab, i):
 
 def set_nibble(tab, i, v):
     sh = (i & 1) * 4
-    tab[i >> 1] = (tab[i >> 1] & ~(15 << sh) & 0xFF) | (v << sh)
+    keep = tab[i >> 1] & (0xF0 >> sh)
+    tab[i >> 1] = keep | (v << sh)
 
 
 # ------------------------------------------------------------- tables
@@ -452,6 +454,8 @@ class Search:
         self.nodes += 1
         if rem == 0:
             return self.is_goal(c, e)
+        if self.nodes > NODE_LIMIT:
+            return False
         t = self.t
         for m in range(32):
             c2 = t.cm[m * N_PERM + c]
@@ -472,7 +476,7 @@ class Search:
     def solve(self, c, e, es, max_depth):
         t = self.t
         rem = max(t.dc[c], t.de[e], get_nibble(t.dcs, c * N_SET + es))
-        while rem <= max_depth:
+        while rem <= max_depth and self.nodes <= NODE_LIMIT:
             self.path = []
             if self.dfs(c, e, es, rem):
                 return True

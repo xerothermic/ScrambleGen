@@ -186,6 +186,7 @@ struct CustomizationScreen: View {
     @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
     @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
     @AppStorage(ScrambleSource.randomStateKey) private var randomState = ScrambleSource.defaultRandomState
+    @AppStorage(ScrambleSource.square1RandomStateKey) private var square1RandomState = ScrambleSource.defaultSquare1RandomState
 
     var body: some View {
         Form {
@@ -204,6 +205,15 @@ struct CustomizationScreen: View {
                     }
             } header: {
                 sectionHeader("3x3 scramble")
+            }
+            Section {
+                Toggle(isOn: $square1RandomState) { Text("Square-1 random-state").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .onChange(of: square1RandomState) { _, on in
+                        if on { ScrambleSource.prewarmSquare1() }
+                    }
+            } header: {
+                sectionHeader("Square-1 scramble")
             }
             Section {
                 Toggle(isOn: $feedback) { Text("Crown feedback").font(.system(size: 11)) }
