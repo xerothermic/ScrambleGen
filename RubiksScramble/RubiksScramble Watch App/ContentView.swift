@@ -265,6 +265,19 @@ struct ContentView: View {
                 moves[option] = option.generate(
                     length: lengths[option] ?? option.defaultLength)
             }
+            // Random-state 3x3: build the solver tables in the background; the
+            // random-move scramble above is shown until they are ready, then
+            // swapped for a random-state one if the user hasn't asked for a new one.
+            if ScrambleSource.randomStateEnabled {
+                let placeholder = moves[.cube3x3]
+                Task {
+                    await Task.detached(priority: .utility) { _ = RandomState333.prepare() }.value
+                    if moves[.cube3x3] == placeholder, ScrambleSource.randomStateEnabled {
+                        moves[.cube3x3] = await ScrambleSource.next(
+                            for: .cube3x3, length: lengths[.cube3x3] ?? Puzzle.cube3x3.defaultLength)
+                    }
+                }
+            }
         }
     }
 }
@@ -842,12 +855,13 @@ private struct ScrambleScreen: View {
 
     /// Right-align each Square-1 number in a 2-char column, so `(1,0)/` reads
     /// `( 1, 0)/` and `(-3,3)/` reads `(-3, 3)/`: the commas, parentheses and
-    /// slashes of every token line up in the monospaced rows. Bare `/` is left as is.
+    /// slashes of every token line up in the monospaced rows. Bare `/` is left as is;
+    /// a last turn without slice (random-state scrambles) keeps no slash.
     private static func aligned(_ token: String) -> String {
         let parts = token.dropFirst().prefix { $0 != ")" }.split(separator: ",")
         guard token.hasPrefix("("), parts.count == 2 else { return token }
         let cols = parts.map { String(repeating: " ", count: max(0, 2 - $0.count)) + $0 }
-        return "(\(cols[0]),\(cols[1]))/"
+        return "(\(cols[0]),\(cols[1]))" + (token.hasSuffix("/") ? "/" : "")
     }
 
     var body: some View {
@@ -953,11 +967,15 @@ private struct ScrambleScreen: View {
                     }
 
                     Button {
-                        moves[puzzle] = puzzle.generate(length: length)
                         isSelected = false
-                        // Show the new move list from its first move.
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            proxy.scrollTo(Self.topID, anchor: .top)
+                        // 3x3 random-state scrambles take a moment off the main
+                        // thread; the others come back immediately.
+                        Task {
+                            moves[puzzle] = await ScrambleSource.next(for: puzzle, length: length)
+                            // Show the new move list from its first move.
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                proxy.scrollTo(Self.topID, anchor: .top)
+                            }
                         }
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
@@ -983,6 +1001,19 @@ private struct ScrambleScreen: View {
         }
         // Swiping to the other puzzle shouldn't leave the crown bound here.
         .onDisappear { isSelected = false }
+        // Random-state Square-1: the solver tables are built in the background
+        // the first time the Square-1 card is shown; the random-move scramble
+        // stays up until they are ready, then is swapped for a random-state
+        // one if the user hasn't asked for a new one meanwhile.
+        .task {
+            guard puzzle == .square1, ScrambleSource.square1RandomStateEnabled,
+                  !Square1RandomState.isReady else { return }
+            let placeholder = moves[.square1]
+            await Task.detached(priority: .utility) { _ = Square1RandomState.prepare() }.value
+            if moves[.square1] == placeholder, ScrambleSource.square1RandomStateEnabled {
+                moves[.square1] = await ScrambleSource.next(for: .square1, length: length)
+            }
+        }
     }
 }
 

@@ -20,6 +20,9 @@
 		AA0000000000000000000045 /* CustomizationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000044 /* CustomizationView.swift */; };
 		AA0000000000000000000025 /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000024 /* TimerView.swift */; };
 		AA0000000000000000000C02 /* ClockScrambler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000C01 /* ClockScrambler.swift */; };
+		AA0000000000000000000E02 /* ScrambleSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000E01 /* ScrambleSource.swift */; };
+		AA0000000000000000000E04 /* RandomState333.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000E03 /* RandomState333.swift */; };
+		AA0000000000000000000E06 /* Square1RandomState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000E05 /* Square1RandomState.swift */; };
 		AA000000000000000000001F /* Square1MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001E /* Square1MapView.swift */; };
 		AA0000000000000000000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000016 /* Assets.xcassets */; };
 		AA0000000000000000000021 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* PrivacyInfo.xcprivacy */; };
@@ -102,6 +105,9 @@
 		AA0000000000000000000044 /* CustomizationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizationView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000024 /* TimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000C01 /* ClockScrambler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockScrambler.swift; sourceTree = "<group>"; };
+		AA0000000000000000000E01 /* ScrambleSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrambleSource.swift; sourceTree = "<group>"; };
+		AA0000000000000000000E03 /* RandomState333.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RandomState333.swift; sourceTree = "<group>"; };
+		AA0000000000000000000E05 /* Square1RandomState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Square1RandomState.swift; sourceTree = "<group>"; };
 		AA000000000000000000001E /* Square1MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Square1MapView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA0000000000000000000020 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -171,6 +177,9 @@
 				AA000000000000000000001A /* CubeMapView.swift */,
 				AA000000000000000000001C /* Square1Scrambler.swift */,
 				AA0000000000000000000C01 /* ClockScrambler.swift */,
+				AA0000000000000000000E01 /* ScrambleSource.swift */,
+				AA0000000000000000000E03 /* RandomState333.swift */,
+				AA0000000000000000000E05 /* Square1RandomState.swift */,
 				AA000000000000000000001E /* Square1MapView.swift */,
 				AA0000000000000000000024 /* TimerView.swift */,
 				AA00000000000000000D0001 /* PremiumFeatures.swift */,
@@ -330,6 +339,9 @@
 				AA000000000000000000001B /* CubeMapView.swift in Sources */,
 				AA000000000000000000001D /* Square1Scrambler.swift in Sources */,
 				AA0000000000000000000C02 /* ClockScrambler.swift in Sources */,
+				AA0000000000000000000E02 /* ScrambleSource.swift in Sources */,
+				AA0000000000000000000E04 /* RandomState333.swift in Sources */,
+				AA0000000000000000000E06 /* Square1RandomState.swift in Sources */,
 				AA000000000000000000001F /* Square1MapView.swift in Sources */,
 				AA0000000000000000000025 /* TimerView.swift in Sources */,
 				AA00000000000000000E0001 /* PremiumFeatures.swift in Sources */,
@@ -499,7 +511,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -527,7 +539,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -548,7 +560,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -565,7 +577,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -586,7 +598,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -611,7 +623,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;

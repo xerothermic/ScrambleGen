@@ -64,18 +64,12 @@ enum Ao5Settings {
         return min(max(d.integer(forKey: key), range.lowerBound), range.upperBound)
     }
 
+    /// Crown speed tuning was removed from Customization: only feedback settings are read; speed always uses defaults.
     static func load() -> Snapshot {
         let d = UserDefaults.standard
         var s = Snapshot()
         if d.object(forKey: feedbackKey) != nil { s.feedback = d.bool(forKey: feedbackKey) }
         s.interval = int(d, intervalKey, defaultInterval, intervalRange)
-        s.step = int(d, stepKey, defaultStep, stepRange)
-        if d.object(forKey: accelKey) != nil {
-            s.accel = Ao5Accel(rawValue: d.integer(forKey: accelKey)) ?? .gentle
-        }
-        s.stepsPerRev = int(d, stepsKey, defaultSteps, stepsRange)
-        s.unitsPerRev = Double(int(d, unitsKey, defaultUnits, unitsRange))
-        s.accelThreshold = Double(int(d, accel1Key, defaultAccel1, accelRange))
         return s
     }
 
@@ -187,15 +181,12 @@ struct AccelRow: View {
 struct CustomizationScreen: View {
     @AppStorage(Ao5Settings.feedbackKey) private var feedback = Ao5Settings.defaultFeedback
     @AppStorage(Ao5Settings.intervalKey) private var interval = Ao5Settings.defaultInterval
-    @AppStorage(Ao5Settings.stepKey) private var step = Ao5Settings.defaultStep
-    @AppStorage(Ao5Settings.accelKey) private var accel = Ao5Settings.defaultAccel
-    @AppStorage(Ao5Settings.stepsKey) private var stepsPerRev = Ao5Settings.defaultSteps
-    @AppStorage(Ao5Settings.unitsKey) private var units = Ao5Settings.defaultUnits
-    @AppStorage(Ao5Settings.accel1Key) private var accel1 = Ao5Settings.defaultAccel1
 
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
     @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
+    @AppStorage(ScrambleSource.randomStateKey) private var randomState = ScrambleSource.defaultRandomState
+    @AppStorage(ScrambleSource.square1RandomStateKey) private var square1RandomState = ScrambleSource.defaultSquare1RandomState
 
     var body: some View {
         Form {
@@ -207,33 +198,29 @@ struct CustomizationScreen: View {
                 sectionHeader("Scramble")
             }
             Section {
-                TuneRow("Crown speed", value: $step, range: Ao5Settings.stepRange, step: 1)
-                TuneRow("Steps per rev", unit: "", value: $stepsPerRev, range: Ao5Settings.stepsRange, step: 10)
-                TuneRow("Units per rev", unit: "", value: $units, range: Ao5Settings.unitsRange, step: 10)
-                AccelRow(selection: $accel)
-                if accel == Ao5Accel.custom.rawValue {
-                    TuneRow("x10 from", unit: "/s", value: $accel1, range: Ao5Settings.accelRange, step: 10)
-                }
+                Toggle(isOn: $randomState) { Text("3x3 random-state").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .onChange(of: randomState) { _, on in
+                        if on { ScrambleSource.prewarm() }
+                    }
+            } header: {
+                sectionHeader("3x3 scramble")
+            }
+            Section {
+                Toggle(isOn: $square1RandomState) { Text("Square-1 random-state").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .onChange(of: square1RandomState) { _, on in
+                        if on { ScrambleSource.prewarmSquare1() }
+                    }
+            } header: {
+                sectionHeader("Square-1 scramble")
+            }
+            Section {
                 Toggle(isOn: $feedback) { Text("Crown feedback").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                 if feedback {
                     TuneRow("Feedback every", value: $interval, range: Ao5Settings.intervalRange, step: 1)
                 }
-                Button(role: .destructive) {
-                    DebugLog.log("tap Reset")
-                    Ao5Settings.resetToDefaults()
-                    feedback = Ao5Settings.defaultFeedback
-                    interval = Ao5Settings.defaultInterval
-                    step = Ao5Settings.defaultStep
-                    accel = Ao5Settings.defaultAccel
-                    stepsPerRev = Ao5Settings.defaultSteps
-                    units = Ao5Settings.defaultUnits
-                    accel1 = Ao5Settings.defaultAccel1
-                } label: {
-                    Text("Reset to defaults").font(.system(size: 11))
-                }
-                .controlSize(.mini)
-                .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
             } header: {
                 sectionHeader("Ao5")
             }
@@ -251,11 +238,6 @@ struct CustomizationScreen: View {
         .font(.system(size: 11))
         .navigationTitle("Customization")
         .onAppear { DebugLog.log("Customization appeared (container drags gated off)") }
-        .onChange(of: step) { DebugLog.setting("step", $0, $1) }
-        .onChange(of: stepsPerRev) { DebugLog.setting("stepsPerRev", $0, $1) }
-        .onChange(of: units) { DebugLog.setting("units", $0, $1) }
-        .onChange(of: accel) { DebugLog.setting("accel", $0, $1) }
-        .onChange(of: accel1) { DebugLog.setting("accel1", $0, $1) }
         .onChange(of: interval) { DebugLog.setting("interval", $0, $1) }
         .onChange(of: feedback) { DebugLog.setting("feedback", $0, $1) }
         .onChange(of: debug) { DebugLog.setting("debug", $0, $1) }
