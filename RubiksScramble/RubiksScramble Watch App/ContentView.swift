@@ -261,8 +261,6 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            // A saved Clock selection (hidden, `Puzzle.clockEnabled`) falls back to 3x3.
-            if !Puzzle.allCases.contains(puzzle) { puzzle = .cube3x3 }
             for option in Puzzle.allCases where moves[option] == nil {
                 moves[option] = option.generate(
                     length: lengths[option] ?? option.defaultLength)

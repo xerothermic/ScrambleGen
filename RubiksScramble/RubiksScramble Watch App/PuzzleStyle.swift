@@ -63,11 +63,6 @@ enum ComplicationTarget: String, CaseIterable {
     case clock
     case timer
 
-    /// Complication picker options; Clock is hidden while `Puzzle.clockEnabled` is false.
-    static var allCases: [ComplicationTarget] {
-        Puzzle.clockEnabled ? [.cube3x3, .square1, .clock, .timer] : [.cube3x3, .square1, .timer]
-    }
-
     init(_ puzzle: Puzzle) {
         switch puzzle {
         case .cube3x3: self = .cube3x3
@@ -77,8 +72,7 @@ enum ComplicationTarget: String, CaseIterable {
     }
 
     /// The puzzle this opens; nil for the Timer card.
-    /// A previously configured Clock complication therefore opens the Timer card.
-    var puzzle: Puzzle? { Puzzle(rawValue: rawValue).flatMap { Puzzle.allCases.contains($0) ? $0 : nil } }
+    var puzzle: Puzzle? { Puzzle(rawValue: rawValue) }
 
     var name: String {
         switch self {
