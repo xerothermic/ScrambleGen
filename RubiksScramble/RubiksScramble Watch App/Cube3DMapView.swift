@@ -145,6 +145,7 @@ struct Map3DView: View {
             )
             .onTapGesture(count: 2) { attitude.recenter(); yaw = 0; pitch = 0 }
             .modifier(CloseAwareTitle(title: title))
+            .hidingTime()
         }
         .onAppear { sync() }
         .onDisappear { attitude.stop() }

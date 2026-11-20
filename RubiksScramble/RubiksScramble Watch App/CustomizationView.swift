@@ -20,6 +20,10 @@ enum GeneralSettings {
     // v2 key: everyone starts with beta off again (a stored "on" under the old key is ignored).
     static let betaKey = "beta.enabled2"
     static let defaultBeta = false
+    /// Hide the system time of day (top right of the navigation bar) where the
+    /// API allows: `.toolbar(.hidden, for: .navigationBar)` via `HideTimeModifier`.
+    static let hideTimeKey = "display.hideTime"
+    static let defaultHideTime = false
     /// Orientation pill above the scramble ("White top · Green front" for 3x3,
     /// the notation hints for Square-1 and Clock). Shared by all puzzles.
     static let hintKey = "scramble.orientationHint"
@@ -185,6 +189,21 @@ struct AccelRow: View {
     }
 }
 
+/// Hides the navigation bar (title, time of day) when Customization > Display >
+/// "Hide time" is on. Apply INSIDE a NavigationStack. `when` lets a screen keep
+/// the bar while it needs the bar's toolbar buttons.
+struct HideTimeModifier: ViewModifier {
+    var when = true
+    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
+    func body(content: Content) -> some View {
+        content.toolbar(hideTime && when ? .hidden : .automatic, for: .navigationBar)
+    }
+}
+
+extension View {
+    func hidingTime(when: Bool = true) -> some View { modifier(HideTimeModifier(when: when)) }
+}
+
 /// Settings screen: one Section per feature, so adding a feature = adding a
 /// Section here (and its keys above).
 struct CustomizationScreen: View {
@@ -193,6 +212,7 @@ struct CustomizationScreen: View {
 
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
+    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
     @AppStorage(GeneralSettings.shakeKey) private var shakeNew = GeneralSettings.defaultShake
     @AppStorage(GeneralSettings.cube3DKey) private var cube3D = GeneralSettings.defaultCube3D
@@ -202,6 +222,13 @@ struct CustomizationScreen: View {
 
     var body: some View {
         Form {
+            Section {
+                Toggle(isOn: $hideTime) { Text("Hide time").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("hide time toggle")
+            } header: {
+                sectionHeader("Display")
+            }
             Section {
                 Toggle(isOn: $hint) { Text("Orientation hint").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))

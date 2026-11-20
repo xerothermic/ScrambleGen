@@ -111,9 +111,9 @@ struct ContentView: View {
         } else if showTimer {
             TimerScreen(solves: $timerSolves)
         } else if showAo5 {
-            NavigationStack { Ao5Screen() }
+            NavigationStack { Ao5Screen().hidingTime() }
         } else if showCalibrate {
-            NavigationStack { CalibrateScreen() }
+            NavigationStack { CalibrateScreen().hidingTime() }
         } else if showInputLog {
             NavigationStack { InputLogScreen().toolbar { closeToolbar } }
         } else if showCustom {
@@ -811,6 +811,7 @@ private struct PuzzlePage: View {
 
 private struct ScrambleScreen: View {
     let puzzle: Puzzle
+    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
@@ -908,6 +909,12 @@ private struct ScrambleScreen: View {
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 12) {
+                    // Nav bar (title + time) is hidden by "Hide time": keep the name in content.
+                    if hideTime {
+                        Text(puzzle.name)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                     // 3×3: the standard WCA scrambling orientation, with the
                     // green pill + white text echoing the two reference faces.
                     // Square-1: how to read the notation.
@@ -1029,6 +1036,7 @@ private struct ScrambleScreen: View {
             .onChange(of: shakeTick) { regenerate(proxy) }
             }
             .modifier(CloseAwareTitle(title: puzzle.name))
+            .hidingTime()
         }
         // Swiping to the other puzzle shouldn't leave the crown bound here.
         .onDisappear { isSelected = false; shake.stop() }
