@@ -39,6 +39,17 @@ enum Puzzle: String, CaseIterable, Identifiable {
     case square1
     case clock
 
+    /// Single switch for the Clock puzzle. false = hidden everywhere (card stack,
+    /// deep links, complication picker, saved selection falls back to 3x3).
+    /// The Clock code stays in place; set to true to bring it back (the Beta
+    /// features switch then gates it again).
+    static let clockEnabled = false
+
+    /// Every puzzle the UI may offer (Clock only while `clockEnabled`).
+    static var allCases: [Puzzle] {
+        clockEnabled ? [.cube3x3, .square1, .clock] : [.cube3x3, .square1]
+    }
+
     var id: Self { self }
 
     var name: String {
