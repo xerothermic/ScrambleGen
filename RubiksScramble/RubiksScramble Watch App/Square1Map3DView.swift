@@ -31,16 +31,14 @@ struct Square1Map3DView: View {
         let scale = Float(min(size.width, size.height)) / 3.9
         let camera: Float = 6
         let project = Map3DView.projector(m, size: size, scale: scale, camera: camera)
-        let eye = SIMD3<Float>(0, 0, camera)
 
         // Back-face culling against the real eye position, then painter's
         // algorithm (far to near) over the remaining convex polygons.
         var visible: [(depth: Float, face: SQ1Face)] = []
         for f in faces {
-            let n = m * f.normal
-            let q = f.points.map { m * $0 }
-            guard simd_dot(n, eye - q[0]) > 0.001 else { continue }
-            visible.append((q.reduce(0) { $0 + $1.z } / Float(q.count), f))
+            let c = f.points.reduce(SIMD3<Float>(repeating: 0), +) / Float(f.points.count)
+            guard Map3DView.isFrontFacing(m, normal: f.normal, center: c, camera: camera) else { continue }
+            visible.append(((m * c).z, f))
         }
         visible.sort { $0.depth < $1.depth }
         for (_, f) in visible {

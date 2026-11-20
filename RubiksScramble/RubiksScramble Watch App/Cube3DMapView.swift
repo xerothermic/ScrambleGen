@@ -113,6 +113,16 @@ struct Map3DView: View {
         }
     }
 
+    /// Back-face test shared by the 3D maps. `n` and `center` are in model
+    /// space; both are rotated by `m` and the face is front-facing when its
+    /// rotated normal points toward the eye at (0, 0, camera), using the vector
+    /// from the face centre to the eye (not just the z component).
+    static func isFrontFacing(_ m: simd_float3x3, normal n: SIMD3<Float>,
+                              center: SIMD3<Float>, camera: Float) -> Bool {
+        let eye = SIMD3<Float>(0, 0, camera)
+        return simd_dot(m * n, eye - m * center) > 0.001
+    }
+
     var body: some View {
         NavigationStack {
             Canvas { ctx, size in
@@ -160,8 +170,10 @@ struct Cube3DMapView: View {
         switch f {
         case .front: return (SIMD3(0, 0, 1), SIMD3(1, 0, 0), SIMD3(0, -1, 0))
         case .back: return (SIMD3(0, 0, -1), SIMD3(-1, 0, 0), SIMD3(0, -1, 0))
-        case .up: return (SIMD3(0, 1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1) * -1)
-        case .down: return (SIMD3(0, -1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1))
+        // Up: row 0 is the back edge, so rows run toward the front (+z).
+        // Down: row 0 is the front edge, so rows run toward the back (-z).
+        case .up: return (SIMD3(0, 1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1))
+        case .down: return (SIMD3(0, -1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, -1))
         case .right: return (SIMD3(1, 0, 0), SIMD3(0, 0, -1), SIMD3(0, -1, 0))
         case .left: return (SIMD3(-1, 0, 0), SIMD3(0, 0, 1), SIMD3(0, -1, 0))
         }
@@ -191,10 +203,18 @@ struct Cube3DMapView: View {
             return path
         }
         let inset: Float = 0.05
+        // Cull faces turned away from the eye, then paint far to near by the
+        // rotated centre depth (+z is toward the camera).
+        var visible: [(depth: Float, face: CubeFace)] = []
         for face in CubeFace.allCases {
+            let n = Self.axes(face).n
+            let center = n * 1.5
+            guard Map3DView.isFrontFacing(m, normal: n, center: center, camera: camera) else { continue }
+            visible.append(((m * center).z, face))
+        }
+        visible.sort { $0.depth < $1.depth }
+        for (_, face) in visible {
             let ax = Self.axes(face)
-            // Back-face culling: the camera looks down -z, faces with normal z > 0 are visible.
-            guard (m * ax.n).z > 0.02 else { continue }
             let origin = ax.n * 1.5 - ax.right * 1.5 - ax.down * 1.5
             ctx.fill(quad(origin, ax.right * 3, ax.down * 3), with: .color(Color(white: 0.08)))
             for r in 0..<3 {
