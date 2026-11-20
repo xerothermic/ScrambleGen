@@ -41,6 +41,9 @@
 		AA00000000000000000E0002 /* SolveStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0002 /* SolveStore.swift */; };
 		AA00000000000000000E0003 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0003 /* StatsView.swift */; };
 		AA00000000000000000E0004 /* MotionCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0004 /* MotionCapture.swift */; };
+		AA00000000000000000E0006 /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0006 /* ShakeDetector.swift */; };
+		AA00000000000000000E0007 /* Cube3DMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0007 /* Cube3DMapView.swift */; };
+		AA00000000000000000E0008 /* Square1Map3DView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0008 /* Square1Map3DView.swift */; };
 		AA00000000000000000E0005 /* PauseAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0005 /* PauseAnalysis.swift */; };
 		AA0000000000000000000033 /* AlgoArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* AlgoArt.swift */; };
 		AA0000000000000000000035 /* AlgoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000034 /* AlgoData.swift */; };
@@ -121,6 +124,9 @@
 		AA00000000000000000D0002 /* SolveStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolveStore.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0003 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0004 /* MotionCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionCapture.swift; sourceTree = "<group>"; };
+		AA00000000000000000D0006 /* ShakeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakeDetector.swift; sourceTree = "<group>"; };
+		AA00000000000000000D0007 /* Cube3DMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cube3DMapView.swift; sourceTree = "<group>"; };
+		AA00000000000000000D0008 /* Square1Map3DView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Square1Map3DView.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0005 /* PauseAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseAnalysis.swift; sourceTree = "<group>"; };
 		AA0000000000000000000032 /* AlgoArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoArt.swift; sourceTree = "<group>"; };
 		AA0000000000000000000034 /* AlgoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoData.swift; sourceTree = "<group>"; };
@@ -186,6 +192,9 @@
 				AA00000000000000000D0002 /* SolveStore.swift */,
 				AA00000000000000000D0003 /* StatsView.swift */,
 				AA00000000000000000D0004 /* MotionCapture.swift */,
+				AA00000000000000000D0006 /* ShakeDetector.swift */,
+				AA00000000000000000D0007 /* Cube3DMapView.swift */,
+				AA00000000000000000D0008 /* Square1Map3DView.swift */,
 				AA00000000000000000D0005 /* PauseAnalysis.swift */,
 				AA0000000000000000000032 /* AlgoArt.swift */,
 				AA0000000000000000000034 /* AlgoData.swift */,
@@ -348,6 +357,9 @@
 				AA00000000000000000E0002 /* SolveStore.swift in Sources */,
 				AA00000000000000000E0003 /* StatsView.swift in Sources */,
 				AA00000000000000000E0004 /* MotionCapture.swift in Sources */,
+				AA00000000000000000E0006 /* ShakeDetector.swift in Sources */,
+				AA00000000000000000E0007 /* Cube3DMapView.swift in Sources */,
+				AA00000000000000000E0008 /* Square1Map3DView.swift in Sources */,
 				AA00000000000000000E0005 /* PauseAnalysis.swift in Sources */,
 				AA0000000000000000000041 /* AverageOfFive.swift in Sources */,
 				AA0000000000000000000043 /* Ao5View.swift in Sources */,
@@ -511,7 +523,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -539,7 +551,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -560,7 +572,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -577,7 +589,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Watch Scramble";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -598,7 +610,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -623,7 +635,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.pcintaiwan.scramblegen.watch.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;

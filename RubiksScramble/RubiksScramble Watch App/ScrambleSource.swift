@@ -36,7 +36,11 @@ enum ScrambleSource {
     /// New scramble for `puzzle`. 3x3 and Square-1 use a random-state scramble
     /// when enabled and the tables are built; otherwise (while the tables are
     /// building, or toggle off) the random-move generator answers immediately.
+    /// A random-state scramble has its own length (~20 moves / ~12-14 slices),
+    /// so it is used only while the Length pill is at its default; moving the
+    /// pill off the default gives a random-move scramble of exactly that length.
     static func next(for puzzle: Puzzle, length: Int) async -> [String] {
+        guard length == puzzle.defaultLength else { return puzzle.generate(length: length) }
         if puzzle == .cube3x3 && randomStateEnabled {
             if RandomState333.isReady {
                 return await Task.detached(priority: .userInitiated) {

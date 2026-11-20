@@ -111,9 +111,9 @@ struct ContentView: View {
         } else if showTimer {
             TimerScreen(solves: $timerSolves)
         } else if showAo5 {
-            NavigationStack { Ao5Screen() }
+            NavigationStack { Ao5Screen().hidingTime() }
         } else if showCalibrate {
-            NavigationStack { CalibrateScreen() }
+            NavigationStack { CalibrateScreen().hidingTime() }
         } else if showInputLog {
             NavigationStack { InputLogScreen().toolbar { closeToolbar } }
         } else if showCustom {
@@ -782,16 +782,27 @@ private struct PuzzlePage: View {
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
     @Binding var page: Int
+    @AppStorage(GeneralSettings.cube3DKey) private var cube3D = GeneralSettings.defaultCube3D
 
     var body: some View {
         // Scramble on top; swipe down for the puzzle's state after it.
         TabView(selection: $page) {
-            ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves)
+            ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves, active: page == 0)
                 .tag(0)
             switch puzzle {
-            case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+            case .square1:
+                if cube3D {
+                    Square1Map3DView(moves: moves[puzzle] ?? [], active: page == 1).tag(1)
+                } else {
+                    Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+                }
             case .clock: ClockMapView(moves: moves[puzzle] ?? []).tag(1)
-            default: CubeMapView(moves: moves[puzzle] ?? []).tag(1)
+            default:
+                if cube3D {
+                    Cube3DMapView(moves: moves[puzzle] ?? [], active: page == 1).tag(1)
+                } else {
+                    CubeMapView(moves: moves[puzzle] ?? []).tag(1)
+                }
             }
         }
         .tabViewStyle(.verticalPage)
@@ -800,6 +811,7 @@ private struct PuzzlePage: View {
 
 private struct ScrambleScreen: View {
     let puzzle: Puzzle
+    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
@@ -812,6 +824,34 @@ private struct ScrambleScreen: View {
     @State private var isSelected = false
     @AppStorage(GeneralSettings.hintKey) private var showHint = GeneralSettings.defaultHint
     private var lengthFocused: Bool { isSelected }
+
+    /// False while the map page (or another card) is showing.
+    let active: Bool
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(GeneralSettings.shakeKey) private var shakeEnabled = GeneralSettings.defaultShake
+    @State private var shake = ShakeDetector()
+    @State private var shakeTick = 0
+
+    private func syncShake() {
+        if shakeEnabled && active && scenePhase == .active {
+            shake.start { shakeTick += 1 }
+        } else {
+            shake.stop()
+        }
+    }
+
+    private func regenerate(_ proxy: ScrollViewProxy) {
+        isSelected = false
+        // 3x3 random-state scrambles take a moment off the main
+        // thread; the others come back immediately.
+        Task {
+            moves[puzzle] = await ScrambleSource.next(for: puzzle, length: length)
+            // Show the new move list from its first move.
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(Self.topID, anchor: .top)
+            }
+        }
+    }
 
     private static let topID = "scrambleTop"
 
@@ -869,6 +909,12 @@ private struct ScrambleScreen: View {
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 12) {
+                    // Nav bar (title + time) is hidden by "Hide time": keep the name in content.
+                    if hideTime {
+                        Text(puzzle.name)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                     // 3×3: the standard WCA scrambling orientation, with the
                     // green pill + white text echoing the two reference faces.
                     // Square-1: how to read the notation.
@@ -967,16 +1013,7 @@ private struct ScrambleScreen: View {
                     }
 
                     Button {
-                        isSelected = false
-                        // 3x3 random-state scrambles take a moment off the main
-                        // thread; the others come back immediately.
-                        Task {
-                            moves[puzzle] = await ScrambleSource.next(for: puzzle, length: length)
-                            // Show the new move list from its first move.
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                proxy.scrollTo(Self.topID, anchor: .top)
-                            }
-                        }
+                        regenerate(proxy)
                     } label: {
                         Label("New Scramble", systemImage: "shuffle")
                             .font(.system(size: 17, weight: .semibold))
@@ -996,11 +1033,19 @@ private struct ScrambleScreen: View {
                 }
                 .padding(.horizontal, 4)
             }
+            .onChange(of: shakeTick) { regenerate(proxy) }
             }
             .modifier(CloseAwareTitle(title: puzzle.name))
+            .hidingTime()
         }
         // Swiping to the other puzzle shouldn't leave the crown bound here.
-        .onDisappear { isSelected = false }
+        .onDisappear { isSelected = false; shake.stop() }
+        // Shake for a new scramble (Customization, default off): the
+        // accelerometer runs only while this screen is the visible, active one.
+        .onAppear { syncShake() }
+        .onChange(of: active) { syncShake() }
+        .onChange(of: scenePhase) { syncShake() }
+        .onChange(of: shakeEnabled) { syncShake() }
         // Random-state Square-1: the solver tables are built in the background
         // the first time the Square-1 card is shown; the random-move scramble
         // stays up until they are ready, then is swapped for a random-state

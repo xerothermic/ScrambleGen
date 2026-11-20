@@ -672,6 +672,8 @@ struct TimerScreen: View {
                 }
             }
             .modifier(CloseAwareTitle(title: "Timer"))
+            // Countdown/run: no time of day (idle/done keep the bar for the stats button).
+            .hidingTime(when: phase == .countdown || phase == .running)
         }
         .onChange(of: phase) { old, new in
             timerLog.info("phase \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public)")

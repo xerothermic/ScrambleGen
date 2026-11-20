@@ -20,10 +20,23 @@ enum GeneralSettings {
     // v2 key: everyone starts with beta off again (a stored "on" under the old key is ignored).
     static let betaKey = "beta.enabled2"
     static let defaultBeta = false
+    /// Hide the system time of day (top right of the navigation bar) where the
+    /// API allows: `.toolbar(.hidden, for: .navigationBar)` via `HideTimeModifier`.
+    static let hideTimeKey = "display.hideTime"
+    static let defaultHideTime = false
     /// Orientation pill above the scramble ("White top · Green front" for 3x3,
     /// the notation hints for Square-1 and Clock). Shared by all puzzles.
     static let hintKey = "scramble.orientationHint"
     static let defaultHint = false
+    /// Shake the watch on the scramble screen for a new scramble.
+    static let shakeKey = "scramble.shakeNew"
+    static let defaultShake = false
+    /// 3x3 map page as a live 3D cube rotated by the gyroscope.
+    static let cube3DKey = "map.cube3DGyro"
+    static let defaultCube3D = false
+    /// 3D cube follows wrist tilt (finger drag always works).
+    static let cube3DTiltKey = "map.cube3DTilt"
+    static let defaultCube3DTilt = true
 }
 
 enum Ao5Settings {
@@ -176,6 +189,21 @@ struct AccelRow: View {
     }
 }
 
+/// Hides the navigation bar (title, time of day) when Customization > Display >
+/// "Hide time" is on. Apply INSIDE a NavigationStack. `when` lets a screen keep
+/// the bar while it needs the bar's toolbar buttons.
+struct HideTimeModifier: ViewModifier {
+    var when = true
+    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
+    func body(content: Content) -> some View {
+        content.toolbar(hideTime && when ? .hidden : .automatic, for: .navigationBar)
+    }
+}
+
+extension View {
+    func hidingTime(when: Bool = true) -> some View { modifier(HideTimeModifier(when: when)) }
+}
+
 /// Settings screen: one Section per feature, so adding a feature = adding a
 /// Section here (and its keys above).
 struct CustomizationScreen: View {
@@ -184,16 +212,36 @@ struct CustomizationScreen: View {
 
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
+    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
+    @AppStorage(GeneralSettings.shakeKey) private var shakeNew = GeneralSettings.defaultShake
+    @AppStorage(GeneralSettings.cube3DKey) private var cube3D = GeneralSettings.defaultCube3D
+    @AppStorage(GeneralSettings.cube3DTiltKey) private var cube3DTilt = GeneralSettings.defaultCube3DTilt
     @AppStorage(ScrambleSource.randomStateKey) private var randomState = ScrambleSource.defaultRandomState
     @AppStorage(ScrambleSource.square1RandomStateKey) private var square1RandomState = ScrambleSource.defaultSquare1RandomState
 
     var body: some View {
         Form {
             Section {
+                Toggle(isOn: $hideTime) { Text("Hide time").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("hide time toggle")
+            } header: {
+                sectionHeader("Display")
+            }
+            Section {
                 Toggle(isOn: $hint) { Text("Orientation hint").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .logTap("hint toggle")
+                Toggle(isOn: $shakeNew) { Text("Shake for new scramble").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("shake toggle")
+                Toggle(isOn: $cube3D) { Text("3D cube / Sq-1 map").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("3d toggle")
+                Toggle(isOn: $cube3DTilt) { Text("3D: tilt wrist").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("3d tilt toggle")
             } header: {
                 sectionHeader("Scramble")
             }
@@ -243,5 +291,8 @@ struct CustomizationScreen: View {
         .onChange(of: debug) { DebugLog.setting("debug", $0, $1) }
         .onChange(of: beta) { DebugLog.setting("beta", $0, $1) }
         .onChange(of: hint) { DebugLog.setting("hint", $0, $1) }
+        .onChange(of: shakeNew) { DebugLog.setting("shakeNew", $0, $1) }
+        .onChange(of: cube3D) { DebugLog.setting("cube3D", $0, $1) }
+        .onChange(of: cube3DTilt) { DebugLog.setting("cube3DTilt", $0, $1) }
     }
 }
