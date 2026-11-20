@@ -1,13 +1,6 @@
 import SwiftUI
 import simd
 
-/// One flat, convex, coloured polygon of the 3D Square-1 model.
-private struct SQ1Face {
-    var points: [SIMD3<Float>]
-    var normal: SIMD3<Float>
-    var color: Color
-}
-
 /// Square-1 map as a perspective 3D model: top and bottom layers built from
 /// the same piece cells as the flat map (30 degree edge wedges, 60 degree
 /// corner kites, stickers from `Square1Drawing`), and the middle layer as two
@@ -18,37 +11,12 @@ struct Square1Map3DView: View {
     let active: Bool
 
     var body: some View {
-        let faces = Square1Model.faces(for: Square1State.scrambled(by: moves))
+        let solids = Square1Model.solids(for: Square1State.scrambled(by: moves))
         Map3DView(title: "Square-1", active: active) { ctx, size, m in
-            Self.draw(&ctx, size: size, faces: faces, rotation: m)
-        }
-    }
-
-    private static func draw(_ ctx: inout GraphicsContext, size: CGSize,
-                             faces: [SQ1Face], rotation m: simd_float3x3) {
-        // Model radius is 1 (corner tips 1.37, half height 0.7); the scale
-        // keeps the ~1.55 bounding radius inside the screen with perspective.
-        let scale = Float(min(size.width, size.height)) / 3.9
-        let camera: Float = 6
-        let project = Map3DView.projector(m, size: size, scale: scale, camera: camera)
-
-        // Back-face culling against the real eye position, then painter's
-        // algorithm (far to near) over the remaining convex polygons.
-        var visible: [(depth: Float, face: SQ1Face)] = []
-        for f in faces {
-            let c = f.points.reduce(SIMD3<Float>(repeating: 0), +) / Float(f.points.count)
-            guard Map3DView.isFrontFacing(m, normal: f.normal, center: c, camera: camera) else { continue }
-            visible.append(((m * c).z, f))
-        }
-        visible.sort { $0.depth < $1.depth }
-        for (_, f) in visible {
-            var path = Path()
-            path.move(to: project(f.points[0]))
-            for p in f.points.dropFirst() { path.addLine(to: project(p)) }
-            path.closeSubpath()
-            ctx.fill(path, with: .color(f.color))
-            ctx.stroke(path, with: .color(.black),
-                       style: StrokeStyle(lineWidth: 0.8, lineJoin: .round))
+            // Model radius is 1 (corner tips 1.37, half height 0.7); the scale
+            // keeps the ~1.55 bounding radius inside the screen with perspective.
+            let scale = Float(min(size.width, size.height)) / 3.9
+            Map3DView.drawSolids(&ctx, solids, rotation: m, size: size, scale: scale, camera: 6)
         }
     }
 }
@@ -61,8 +29,10 @@ private enum Square1Model {
     static let half: Float = cos(15 * .pi / 180)
     static let inside = Color(white: 0.12)
 
-    static func faces(for state: Square1State) -> [SQ1Face] {
-        var out: [SQ1Face] = []
+    /// Every piece (12 top cells grouped into wedges/kites, same at the bottom)
+    /// and the two middle half-prisms is its own convex solid.
+    static func solids(for state: Square1State) -> [Solid3D] {
+        var out: [Solid3D] = []
         addLayer(Array(state.pieces[0..<12]), top: true, into: &out)
         addLayer(Array(state.pieces[12..<24]), top: false, into: &out)
         addMiddle(flipped: !state.sliceSolved, into: &out)
@@ -74,7 +44,7 @@ private enum Square1Model {
     /// Same cell walk as the flat `drawFace`: the top starts at 105 degrees,
     /// the bottom at -105 (seen from below, front at the top of the screen),
     /// clockwise in screen coordinates, 30 degrees per cell.
-    private static func addLayer(_ cells: [Int], top: Bool, into out: inout [SQ1Face]) {
+    private static func addLayer(_ cells: [Int], top: Bool, into out: inout [Solid3D]) {
         let inner = (top ? 1 : -1) * middle / 2
         let outer = (top ? 1 : -1) * (middle / 2 + layer)
         let startDegrees: Float = top ? 105 : -105
@@ -94,20 +64,19 @@ private enum Square1Model {
                 let sy = p.x * sin(a) + p.y * cos(a)
                 return SIMD3(sx, y, top ? sy : -sy)
             }
-            out.append(SQ1Face(points: poly.map { world($0, outer) },
-                               normal: SIMD3(0, top ? 1 : -1, 0), color: fills[0]))
-            // Dark inner side so a layer looks solid from the other side.
-            out.append(SQ1Face(points: poly.map { world($0, inner) },
-                               normal: SIMD3(0, top ? -1 : 1, 0), color: inside))
-            // Rim segments: (1,0) -> next vertex, then onward, around the outside.
-            let rim = Array(poly.dropFirst())
-            for k in 0..<(rim.count - 1) {
-                let p = world(rim[k], outer), q = world(rim[k + 1], outer)
-                let p2 = world(rim[k], inner), q2 = world(rim[k + 1], inner)
-                let mid = (p + q) / 2
-                let n = simd_normalize(SIMD3(mid.x, 0, mid.z))
-                out.append(SQ1Face(points: [p, q, q2, p2], normal: n, color: fills[k + 1]))
+            var faces = [Face3D(points: poly.map { world($0, outer) }, color: fills[0], stroke: true),
+                         // Dark inner side so a layer looks solid from the other side.
+                         Face3D(points: poly.map { world($0, inner) }, color: inside, stroke: true)]
+            // Walls: polygon edge i -> i+1 carries sticker fills[i] on the rim;
+            // the two walls touching the centre are interior (colour nil).
+            for i in poly.indices {
+                let j = (i + 1) % poly.count
+                let rim = i >= 1 && j >= 1
+                faces.append(Face3D(points: [world(poly[i], outer), world(poly[j], outer),
+                                             world(poly[j], inner), world(poly[i], inner)],
+                                    color: rim ? fills[i] : nil, stroke: true))
             }
+            out.append(Solid3D(faces))
             let span = corner ? 2 : 1
             degrees += Float(span) * 30
             cell += span
@@ -132,7 +101,7 @@ private enum Square1Model {
     /// (x > 0 side: top cells 6-11, bottom cells 0-5) turns over about that
     /// normal on a slice: along the cut it mirrors, top and bottom swap (the
     /// prism is symmetric in y), and its stickers travel with it.
-    private static func addMiddle(flipped: Bool, into out: inout [SQ1Face]) {
+    private static func addMiddle(flipped: Bool, into out: inout [Solid3D]) {
         let d = SIMD2<Float>(cos(15 * .pi / 180), sin(15 * .pi / 180))
         let along = SIMD2<Float>(-d.y, d.x)
         let square: [SIMD2<Float>] = [SIMD2(half, half), SIMD2(-half, half),
@@ -144,36 +113,25 @@ private enum Square1Model {
                 turn ? p - 2 * simd_dot(p, along) * along : p
             }
             let moved = poly.map(map)
-            let centre = moved.reduce(SIMD2<Float>(0, 0), +) / Float(moved.count)
             let h = middle / 2
             func p3(_ p: SIMD2<Float>, _ y: Float) -> SIMD3<Float> { SIMD3(p.x, y, p.y) }
-            out.append(SQ1Face(points: moved.map { p3($0, h) }, normal: SIMD3(0, 1, 0), color: inside))
-            out.append(SQ1Face(points: moved.map { p3($0, -h) }, normal: SIMD3(0, -1, 0), color: inside))
+            var faces = [Face3D(points: moved.map { p3($0, h) }, color: inside, stroke: true),
+                         Face3D(points: moved.map { p3($0, -h) }, color: inside, stroke: true)]
             for i in 0..<poly.count {
                 let a = poly[i], b = poly[(i + 1) % poly.count]
-                if abs(simd_dot(a, d)) < 1e-4 && abs(simd_dot(b, d)) < 1e-4 {
-                    // Cut face: dark, facing away from this half's centre.
-                    appendSide(map(a), map(b), color: inside, centre: centre, h: h, into: &out)
-                } else {
+                var color: Color?   // nil: the cut face, interior
+                if !(abs(simd_dot(a, d)) < 1e-4 && abs(simd_dot(b, d)) < 1e-4) {
                     // Sticker colour from the ORIGINAL outward direction of the side.
                     let mid = (a + b) / 2
                     let idx = abs(mid.x) > abs(mid.y) ? (mid.x < 0 ? 0 : 2) : (mid.y < 0 ? 1 : 3)
-                    appendSide(map(a), map(b), color: Square1Drawing.scheme[idx],
-                               centre: centre, h: h, into: &out)
+                    color = Square1Drawing.scheme[idx]
                 }
+                let p = map(a), q = map(b)
+                faces.append(Face3D(points: [p3(p, h), p3(q, h), p3(q, -h), p3(p, -h)],
+                                    color: color, stroke: true))
             }
+            out.append(Solid3D(faces))
         }
-    }
-
-    private static func appendSide(_ a: SIMD2<Float>, _ b: SIMD2<Float>, color: Color,
-                                   centre: SIMD2<Float>, h: Float, into out: inout [SQ1Face]) {
-        let e = b - a
-        var n = SIMD2<Float>(e.y, -e.x)
-        if simd_dot(n, (a + b) / 2 - centre) < 0 { n = -n }
-        n = simd_normalize(n)
-        out.append(SQ1Face(points: [SIMD3(a.x, h, a.y), SIMD3(b.x, h, b.y),
-                                    SIMD3(b.x, -h, b.y), SIMD3(a.x, -h, a.y)],
-                           normal: SIMD3(n.x, 0, n.y), color: color))
     }
 
     /// Sutherland-Hodgman clip of a convex polygon to the half-plane dot(p, d) >= 0.

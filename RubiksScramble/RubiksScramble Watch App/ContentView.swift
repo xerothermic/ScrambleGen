@@ -14,8 +14,11 @@ extension EnvironmentValues {
 struct CloseAwareTitle: ViewModifier {
     let title: String
     @Environment(\.closeShown) private var closeShown
+    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     func body(content: Content) -> some View {
-        content.navigationTitle(closeShown ? "" : title)
+        // With "Hide time" on there is no title at all: a title is what makes
+        // watchOS draw the navigation bar (title + time).
+        content.navigationTitle(closeShown || hideTime ? "" : title)
     }
 }
 
@@ -806,6 +809,9 @@ private struct PuzzlePage: View {
             }
         }
         .tabViewStyle(.verticalPage)
+        // The vertical-page TabView hosts the pages' navigation bars itself, so
+        // the NavigationStacks inside the pages may not be the ones that count.
+        .hidingTime()
     }
 }
 
