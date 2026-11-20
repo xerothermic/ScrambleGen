@@ -1,8 +1,8 @@
 import Foundation
 import CoreMotion
 
-/// Shake-for-new-scramble. Raw accelerometer (includes gravity) at 25 Hz; a
-/// sample whose magnitude differs from 1 g by `threshold` or more counts as a
+/// Shake-for-new-scramble. Device-motion user acceleration (gravity removed)
+/// at 50 Hz; a sample whose magnitude is `threshold` g or more counts as a
 /// shake, then `cooldown` seconds of deaf time so one shake fires once and
 /// ordinary handling (turning the cube, setting the wrist down) does not.
 /// Runs only between start() and stop(); the scramble screen calls start()
@@ -10,11 +10,12 @@ import CoreMotion
 /// (MotionCapture.swift is not reused: it records solve data from the Timer's
 /// device-motion stream; this needs its own light accelerometer stream.)
 final class ShakeDetector {
-    /// Deviation from 1 g that counts as a shake. Wrist flicks are ~0.5-1 g,
-    /// a deliberate shake is 2+ g. THE constant to tune.
-    static let threshold = 1.8
-    static let cooldown: TimeInterval = 1.0
-    static let sampleInterval: TimeInterval = 1.0 / 25.0
+    /// User-acceleration magnitude (g, gravity removed) that counts as a
+    /// shake. Was 1.8 g of raw deviation in 1.4 (1), too insensitive on a
+    /// Watch SE2. THE constant to tune.
+    static let threshold = 1.15
+    static let cooldown: TimeInterval = 0.7
+    static let sampleInterval: TimeInterval = 1.0 / 50.0
 
     private let manager = CMMotionManager()
     private let queue: OperationQueue = {
@@ -27,15 +28,16 @@ final class ShakeDetector {
 
     /// `onShake` is called on the main queue.
     func start(onShake: @escaping () -> Void) {
-        guard !running, manager.isAccelerometerAvailable else { return }
+        guard !running, manager.isDeviceMotionAvailable else { return }
         running = true
         lastFire = ProcessInfo.processInfo.systemUptime   // ignore the first second
-        manager.accelerometerUpdateInterval = Self.sampleInterval
-        manager.startAccelerometerUpdates(to: queue) { [weak self] data, _ in
-            guard let self, let a = data?.acceleration else { return }
+        manager.deviceMotionUpdateInterval = Self.sampleInterval
+        manager.startDeviceMotionUpdates(to: queue) { [weak self] data, _ in
+            guard let self, let data else { return }
+            let a = data.userAcceleration
             let mag = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
-            guard abs(mag - 1) >= Self.threshold else { return }
-            let now = data!.timestamp
+            guard mag >= Self.threshold else { return }
+            let now = data.timestamp
             guard now - self.lastFire >= Self.cooldown else { return }
             self.lastFire = now
             DispatchQueue.main.async { onShake() }
@@ -45,8 +47,8 @@ final class ShakeDetector {
     func stop() {
         guard running else { return }
         running = false
-        manager.stopAccelerometerUpdates()
+        manager.stopDeviceMotionUpdates()
     }
 
-    deinit { manager.stopAccelerometerUpdates() }
+    deinit { manager.stopDeviceMotionUpdates() }
 }

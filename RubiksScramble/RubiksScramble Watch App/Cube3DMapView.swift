@@ -13,6 +13,10 @@ final class CubeAttitude: ObservableObject {
 
     /// Smoothing: weight of the newest sample (1 = no smoothing).
     static let smoothing: Float = 0.25
+    /// The wrist rotation is multiplied by this so a ~40 deg tilt turns the
+    /// cube ~100 deg (hidden faces come into view), clamped to `maxAngle`.
+    static let gain: Float = 2.5
+    static let maxAngle: Float = 120 * .pi / 180
 
     private let manager = CMMotionManager()
     private var reference: simd_float3x3?
@@ -43,12 +47,20 @@ final class CubeAttitude: ObservableObject {
                                                        + q.vector * Self.smoothing))
             }
             self.smoothed = q
-            self.rotation = simd_float3x3(q)
+            self.rotation = simd_float3x3(Self.amplified(q))
         }
+    }
+
+    private static func amplified(_ q: simd_quatf) -> simd_quatf {
+        let s = q.real < 0 ? simd_quatf(vector: -q.vector) : q   // shortest arc
+        let angle = s.angle
+        guard angle > 1e-4 else { return s }
+        return simd_quatf(angle: min(angle * gain, maxAngle), axis: s.axis)
     }
 
     func stop() {
         manager.stopDeviceMotionUpdates()
+        rotation = matrix_identity_float3x3
     }
 
     /// Makes the current wrist pose the neutral view.
@@ -68,6 +80,11 @@ struct Cube3DMapView: View {
     let active: Bool
 
     @StateObject private var attitude = CubeAttitude()
+    @AppStorage(GeneralSettings.cube3DTiltKey) private var tilt = GeneralSettings.defaultCube3DTilt
+    /// Finger rotation (degrees), added on top of the wrist pose.
+    @State private var yaw: Float = 0
+    @State private var pitch: Float = 0
+    @State private var dragStart: (yaw: Float, pitch: Float)?
     @Environment(\.scenePhase) private var scenePhase
 
     /// Resting view: tilt toward the viewer 25 deg, turn 35 deg, so U, F and R show.
@@ -91,24 +108,48 @@ struct Cube3DMapView: View {
         }
     }
 
+    /// Finger offset as a view-space rotation: yaw about the screen's vertical
+    /// axis (drag right turns the front face right), pitch about the horizontal.
+    private var fingerRotation: simd_float3x3 {
+        let a = pitch * .pi / 180, b = yaw * .pi / 180
+        let rx = simd_float3x3(rows: [SIMD3(1, 0, 0), SIMD3(0, cos(a), -sin(a)), SIMD3(0, sin(a), cos(a))])
+        let ry = simd_float3x3(rows: [SIMD3(cos(b), 0, sin(b)), SIMD3(0, 1, 0), SIMD3(-sin(b), 0, cos(b))])
+        return rx * ry
+    }
+
     var body: some View {
         let cube = CubeState.scrambled(by: moves)
         NavigationStack {
             Canvas { ctx, size in
-                draw(&ctx, size: size, cube: cube, rotation: attitude.rotation * Self.base)
+                draw(&ctx, size: size, cube: cube,
+                     rotation: fingerRotation * attitude.rotation * Self.base)
             }
             .contentShape(Rectangle())
-            .onTapGesture(count: 2) { attitude.recenter() }
+            // Finger drag rotates the cube (works with the wrist switch off).
+            // High priority so the page TabView does not take the vertical
+            // drag; the Digital Crown still switches pages.
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { v in
+                        let s = dragStart ?? (yaw, pitch)
+                        dragStart = s
+                        yaw = s.yaw + Float(v.translation.width) * 0.9
+                        pitch = max(-90, min(90, s.pitch + Float(v.translation.height) * 0.9))
+                    }
+                    .onEnded { _ in dragStart = nil }
+            )
+            .onTapGesture(count: 2) { attitude.recenter(); yaw = 0; pitch = 0 }
             .modifier(CloseAwareTitle(title: "Cube"))
         }
         .onAppear { sync() }
         .onDisappear { attitude.stop() }
         .onChange(of: active) { sync() }
         .onChange(of: scenePhase) { sync() }
+        .onChange(of: tilt) { sync() }
     }
 
     private func sync() {
-        if active && scenePhase == .active { attitude.start() } else { attitude.stop() }
+        if active && tilt && scenePhase == .active { attitude.start() } else { attitude.stop() }
     }
 
     private func draw(_ ctx: inout GraphicsContext, size: CGSize, cube: CubeState, rotation m: simd_float3x3) {

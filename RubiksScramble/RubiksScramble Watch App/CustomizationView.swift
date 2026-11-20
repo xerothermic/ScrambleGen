@@ -30,6 +30,9 @@ enum GeneralSettings {
     /// 3x3 map page as a live 3D cube rotated by the gyroscope.
     static let cube3DKey = "map.cube3DGyro"
     static let defaultCube3D = false
+    /// 3D cube follows wrist tilt (finger drag always works).
+    static let cube3DTiltKey = "map.cube3DTilt"
+    static let defaultCube3DTilt = true
 }
 
 enum Ao5Settings {
@@ -193,6 +196,7 @@ struct CustomizationScreen: View {
     @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
     @AppStorage(GeneralSettings.shakeKey) private var shakeNew = GeneralSettings.defaultShake
     @AppStorage(GeneralSettings.cube3DKey) private var cube3D = GeneralSettings.defaultCube3D
+    @AppStorage(GeneralSettings.cube3DTiltKey) private var cube3DTilt = GeneralSettings.defaultCube3DTilt
     @AppStorage(ScrambleSource.randomStateKey) private var randomState = ScrambleSource.defaultRandomState
     @AppStorage(ScrambleSource.square1RandomStateKey) private var square1RandomState = ScrambleSource.defaultSquare1RandomState
 
@@ -205,9 +209,12 @@ struct CustomizationScreen: View {
                 Toggle(isOn: $shakeNew) { Text("Shake for new scramble").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .logTap("shake toggle")
-                Toggle(isOn: $cube3D) { Text("3D cube map (gyro)").font(.system(size: 11)) }
+                Toggle(isOn: $cube3D) { Text("3D cube map").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .logTap("3d toggle")
+                Toggle(isOn: $cube3DTilt) { Text("3D: tilt wrist").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("3d tilt toggle")
             } header: {
                 sectionHeader("Scramble")
             }
@@ -259,5 +266,6 @@ struct CustomizationScreen: View {
         .onChange(of: hint) { DebugLog.setting("hint", $0, $1) }
         .onChange(of: shakeNew) { DebugLog.setting("shakeNew", $0, $1) }
         .onChange(of: cube3D) { DebugLog.setting("cube3D", $0, $1) }
+        .onChange(of: cube3DTilt) { DebugLog.setting("cube3DTilt", $0, $1) }
     }
 }
