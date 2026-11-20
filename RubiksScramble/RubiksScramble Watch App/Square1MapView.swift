@@ -134,13 +134,13 @@ enum Square1Drawing {
         }
     }
 
-    private static func isCorner(_ piece: Int) -> Bool {
+    static func isCorner(_ piece: Int) -> Bool {
         (piece + (piece <= 7 ? 0 : 1)) % 2 == 0
     }
 
     /// Fills in the order of `cornerShapes` / `edgeShapes`: the piece's
     /// top-or-bottom sticker, then its side stickers.
-    private static func colors(of piece: Int) -> [Color] {
+    static func colors(of piece: Int) -> [Color] {
         let up = piece <= 7
         let face = up ? scheme[4] : scheme[5]
         if isCorner(piece) {

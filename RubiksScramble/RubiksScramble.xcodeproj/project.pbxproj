@@ -43,6 +43,7 @@
 		AA00000000000000000E0004 /* MotionCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0004 /* MotionCapture.swift */; };
 		AA00000000000000000E0006 /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0006 /* ShakeDetector.swift */; };
 		AA00000000000000000E0007 /* Cube3DMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0007 /* Cube3DMapView.swift */; };
+		AA00000000000000000E0008 /* Square1Map3DView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0008 /* Square1Map3DView.swift */; };
 		AA00000000000000000E0005 /* PauseAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000D0005 /* PauseAnalysis.swift */; };
 		AA0000000000000000000033 /* AlgoArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* AlgoArt.swift */; };
 		AA0000000000000000000035 /* AlgoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000034 /* AlgoData.swift */; };
@@ -125,6 +126,7 @@
 		AA00000000000000000D0004 /* MotionCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionCapture.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0006 /* ShakeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakeDetector.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0007 /* Cube3DMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cube3DMapView.swift; sourceTree = "<group>"; };
+		AA00000000000000000D0008 /* Square1Map3DView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Square1Map3DView.swift; sourceTree = "<group>"; };
 		AA00000000000000000D0005 /* PauseAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseAnalysis.swift; sourceTree = "<group>"; };
 		AA0000000000000000000032 /* AlgoArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoArt.swift; sourceTree = "<group>"; };
 		AA0000000000000000000034 /* AlgoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlgoData.swift; sourceTree = "<group>"; };
@@ -192,6 +194,7 @@
 				AA00000000000000000D0004 /* MotionCapture.swift */,
 				AA00000000000000000D0006 /* ShakeDetector.swift */,
 				AA00000000000000000D0007 /* Cube3DMapView.swift */,
+				AA00000000000000000D0008 /* Square1Map3DView.swift */,
 				AA00000000000000000D0005 /* PauseAnalysis.swift */,
 				AA0000000000000000000032 /* AlgoArt.swift */,
 				AA0000000000000000000034 /* AlgoData.swift */,
@@ -356,6 +359,7 @@
 				AA00000000000000000E0004 /* MotionCapture.swift in Sources */,
 				AA00000000000000000E0006 /* ShakeDetector.swift in Sources */,
 				AA00000000000000000E0007 /* Cube3DMapView.swift in Sources */,
+				AA00000000000000000E0008 /* Square1Map3DView.swift in Sources */,
 				AA00000000000000000E0005 /* PauseAnalysis.swift in Sources */,
 				AA0000000000000000000041 /* AverageOfFive.swift in Sources */,
 				AA0000000000000000000043 /* Ao5View.swift in Sources */,

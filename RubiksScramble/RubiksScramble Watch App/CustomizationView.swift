@@ -209,7 +209,7 @@ struct CustomizationScreen: View {
                 Toggle(isOn: $shakeNew) { Text("Shake for new scramble").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .logTap("shake toggle")
-                Toggle(isOn: $cube3D) { Text("3D cube map").font(.system(size: 11)) }
+                Toggle(isOn: $cube3D) { Text("3D cube / Sq-1 map").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .logTap("3d toggle")
                 Toggle(isOn: $cube3DTilt) { Text("3D: tilt wrist").font(.system(size: 11)) }

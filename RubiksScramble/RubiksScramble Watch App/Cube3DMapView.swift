@@ -71,13 +71,15 @@ final class CubeAttitude: ObservableObject {
     deinit { manager.stopDeviceMotionUpdates() }
 }
 
-/// 3x3 map as a perspective 3D cube (three faces visible at rest, whichever
-/// are turned toward you as the wrist moves) carrying the scramble state.
-/// Double-tap to recenter. Motion updates stop when the page is not the
-/// visible one, the view disappears, or the app leaves the foreground.
-struct Cube3DMapView: View {
-    let moves: [String]
+/// Shared 3D map shell: wrist tilt (CubeAttitude), finger drag rotation,
+/// double-tap recenter, and starting/stopping motion updates when the page is
+/// hidden, the view disappears or the app leaves the foreground. The caller
+/// supplies the drawing, which receives the full view rotation (finger *
+/// wrist * resting pose) and projects through `Map3DView.projector`.
+struct Map3DView: View {
+    let title: String
     let active: Bool
+    let draw: (inout GraphicsContext, CGSize, simd_float3x3) -> Void
 
     @StateObject private var attitude = CubeAttitude()
     @AppStorage(GeneralSettings.cube3DTiltKey) private var tilt = GeneralSettings.defaultCube3DTilt
@@ -87,13 +89,70 @@ struct Cube3DMapView: View {
     @State private var dragStart: (yaw: Float, pitch: Float)?
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Resting view: tilt toward the viewer 25 deg, turn 35 deg, so U, F and R show.
-    private static let base: simd_float3x3 = {
-        let a = Float(25 * Double.pi / 180), b = Float(-35 * Double.pi / 180)
+    /// Resting view: tilt toward the viewer 25 deg, turn 35 deg, so the top,
+    /// front and right sides show.
+    static let base: simd_float3x3 = rotation(pitch: 25, yaw: -35)
+
+    /// View-space rotation: yaw about the screen's vertical axis, pitch about the horizontal.
+    static func rotation(pitch: Float, yaw: Float) -> simd_float3x3 {
+        let a = pitch * .pi / 180, b = yaw * .pi / 180
         let rx = simd_float3x3(rows: [SIMD3(1, 0, 0), SIMD3(0, cos(a), -sin(a)), SIMD3(0, sin(a), cos(a))])
         let ry = simd_float3x3(rows: [SIMD3(cos(b), 0, sin(b)), SIMD3(0, 1, 0), SIMD3(-sin(b), 0, cos(b))])
         return rx * ry
-    }()
+    }
+
+    /// Perspective projection of model points: camera `camera` units from the
+    /// centre, `scale` points per unit.
+    static func projector(_ m: simd_float3x3, size: CGSize, scale: Float,
+                          camera: Float) -> (SIMD3<Float>) -> CGPoint {
+        let cx = Float(size.width) / 2, cy = Float(size.height) / 2
+        return { p in
+            let q = m * p
+            let k = camera / (camera - q.z)
+            return CGPoint(x: CGFloat(cx + q.x * scale * k), y: CGFloat(cy - q.y * scale * k))
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Canvas { ctx, size in
+                draw(&ctx, size,
+                     Self.rotation(pitch: pitch, yaw: yaw) * attitude.rotation * Self.base)
+            }
+            .contentShape(Rectangle())
+            // Finger drag rotates the model (works with the wrist switch off).
+            // High priority so the page TabView does not take the vertical
+            // drag; the Digital Crown still switches pages.
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { v in
+                        let s = dragStart ?? (yaw, pitch)
+                        dragStart = s
+                        yaw = s.yaw + Float(v.translation.width) * 0.9
+                        pitch = max(-90, min(90, s.pitch + Float(v.translation.height) * 0.9))
+                    }
+                    .onEnded { _ in dragStart = nil }
+            )
+            .onTapGesture(count: 2) { attitude.recenter(); yaw = 0; pitch = 0 }
+            .modifier(CloseAwareTitle(title: title))
+        }
+        .onAppear { sync() }
+        .onDisappear { attitude.stop() }
+        .onChange(of: active) { sync() }
+        .onChange(of: scenePhase) { sync() }
+        .onChange(of: tilt) { sync() }
+    }
+
+    private func sync() {
+        if active && tilt && scenePhase == .active { attitude.start() } else { attitude.stop() }
+    }
+}
+
+/// 3x3 map as a perspective 3D cube (three faces visible at rest, whichever
+/// are turned toward you as the wrist moves) carrying the scramble state.
+struct Cube3DMapView: View {
+    let moves: [String]
+    let active: Bool
 
     /// Per face: outward normal, then the directions of increasing column and
     /// increasing row, matching the flat net (U top row is the back edge).
@@ -108,48 +167,11 @@ struct Cube3DMapView: View {
         }
     }
 
-    /// Finger offset as a view-space rotation: yaw about the screen's vertical
-    /// axis (drag right turns the front face right), pitch about the horizontal.
-    private var fingerRotation: simd_float3x3 {
-        let a = pitch * .pi / 180, b = yaw * .pi / 180
-        let rx = simd_float3x3(rows: [SIMD3(1, 0, 0), SIMD3(0, cos(a), -sin(a)), SIMD3(0, sin(a), cos(a))])
-        let ry = simd_float3x3(rows: [SIMD3(cos(b), 0, sin(b)), SIMD3(0, 1, 0), SIMD3(-sin(b), 0, cos(b))])
-        return rx * ry
-    }
-
     var body: some View {
         let cube = CubeState.scrambled(by: moves)
-        NavigationStack {
-            Canvas { ctx, size in
-                draw(&ctx, size: size, cube: cube,
-                     rotation: fingerRotation * attitude.rotation * Self.base)
-            }
-            .contentShape(Rectangle())
-            // Finger drag rotates the cube (works with the wrist switch off).
-            // High priority so the page TabView does not take the vertical
-            // drag; the Digital Crown still switches pages.
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 6)
-                    .onChanged { v in
-                        let s = dragStart ?? (yaw, pitch)
-                        dragStart = s
-                        yaw = s.yaw + Float(v.translation.width) * 0.9
-                        pitch = max(-90, min(90, s.pitch + Float(v.translation.height) * 0.9))
-                    }
-                    .onEnded { _ in dragStart = nil }
-            )
-            .onTapGesture(count: 2) { attitude.recenter(); yaw = 0; pitch = 0 }
-            .modifier(CloseAwareTitle(title: "Cube"))
+        Map3DView(title: "Cube", active: active) { ctx, size, m in
+            draw(&ctx, size: size, cube: cube, rotation: m)
         }
-        .onAppear { sync() }
-        .onDisappear { attitude.stop() }
-        .onChange(of: active) { sync() }
-        .onChange(of: scenePhase) { sync() }
-        .onChange(of: tilt) { sync() }
-    }
-
-    private func sync() {
-        if active && tilt && scenePhase == .active { attitude.start() } else { attitude.stop() }
     }
 
     private func draw(_ ctx: inout GraphicsContext, size: CGSize, cube: CubeState, rotation m: simd_float3x3) {
@@ -158,12 +180,7 @@ struct Cube3DMapView: View {
         // 4.3-unit diagonal inside the smaller screen dimension (40 mm fits).
         let scale = Float(min(size.width, size.height)) / 5.4
         let camera: Float = 9
-        let cx = Float(size.width) / 2, cy = Float(size.height) / 2
-        func project(_ p: SIMD3<Float>) -> CGPoint {
-            let q = m * p
-            let k = camera / (camera - q.z)
-            return CGPoint(x: CGFloat(cx + q.x * scale * k), y: CGFloat(cy - q.y * scale * k))
-        }
+        let project = Map3DView.projector(m, size: size, scale: scale, camera: camera)
         func quad(_ o: SIMD3<Float>, _ u: SIMD3<Float>, _ v: SIMD3<Float>) -> Path {
             var path = Path()
             path.move(to: project(o))

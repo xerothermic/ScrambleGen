@@ -790,7 +790,12 @@ private struct PuzzlePage: View {
             ScrambleScreen(puzzle: puzzle, lengths: $lengths, moves: $moves, active: page == 0)
                 .tag(0)
             switch puzzle {
-            case .square1: Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+            case .square1:
+                if cube3D {
+                    Square1Map3DView(moves: moves[puzzle] ?? [], active: page == 1).tag(1)
+                } else {
+                    Square1MapView(moves: moves[puzzle] ?? []).tag(1)
+                }
             case .clock: ClockMapView(moves: moves[puzzle] ?? []).tag(1)
             default:
                 if cube3D {
