@@ -196,7 +196,9 @@ struct HideTimeModifier: ViewModifier {
     var when = true
     @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     func body(content: Content) -> some View {
-        content.toolbar(hideTime && when ? .hidden : .automatic, for: .navigationBar)
+        content
+            .toolbar(hideTime && when ? .hidden : .automatic, for: .navigationBar)
+            .persistentSystemOverlays(hideTime && when ? .hidden : .automatic)
     }
 }
 
