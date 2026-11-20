@@ -24,6 +24,12 @@ enum GeneralSettings {
     /// the notation hints for Square-1 and Clock). Shared by all puzzles.
     static let hintKey = "scramble.orientationHint"
     static let defaultHint = false
+    /// Shake the watch on the scramble screen for a new scramble.
+    static let shakeKey = "scramble.shakeNew"
+    static let defaultShake = false
+    /// 3x3 map page as a live 3D cube rotated by the gyroscope.
+    static let cube3DKey = "map.cube3DGyro"
+    static let defaultCube3D = false
 }
 
 enum Ao5Settings {
@@ -185,6 +191,8 @@ struct CustomizationScreen: View {
     @AppStorage(GeneralSettings.debugKey) private var debug = GeneralSettings.defaultDebug
     @AppStorage(GeneralSettings.betaKey) private var beta = GeneralSettings.defaultBeta
     @AppStorage(GeneralSettings.hintKey) private var hint = GeneralSettings.defaultHint
+    @AppStorage(GeneralSettings.shakeKey) private var shakeNew = GeneralSettings.defaultShake
+    @AppStorage(GeneralSettings.cube3DKey) private var cube3D = GeneralSettings.defaultCube3D
     @AppStorage(ScrambleSource.randomStateKey) private var randomState = ScrambleSource.defaultRandomState
     @AppStorage(ScrambleSource.square1RandomStateKey) private var square1RandomState = ScrambleSource.defaultSquare1RandomState
 
@@ -194,6 +202,12 @@ struct CustomizationScreen: View {
                 Toggle(isOn: $hint) { Text("Orientation hint").font(.system(size: 11)) }
                     .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .logTap("hint toggle")
+                Toggle(isOn: $shakeNew) { Text("Shake for new scramble").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("shake toggle")
+                Toggle(isOn: $cube3D) { Text("3D cube map (gyro)").font(.system(size: 11)) }
+                    .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
+                    .logTap("3d toggle")
             } header: {
                 sectionHeader("Scramble")
             }
@@ -243,5 +257,7 @@ struct CustomizationScreen: View {
         .onChange(of: debug) { DebugLog.setting("debug", $0, $1) }
         .onChange(of: beta) { DebugLog.setting("beta", $0, $1) }
         .onChange(of: hint) { DebugLog.setting("hint", $0, $1) }
+        .onChange(of: shakeNew) { DebugLog.setting("shakeNew", $0, $1) }
+        .onChange(of: cube3D) { DebugLog.setting("cube3D", $0, $1) }
     }
 }
