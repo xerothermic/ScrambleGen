@@ -36,7 +36,6 @@ struct CubeMapView: View {
                 .frame(maxWidth: .infinity)
             }
             .modifier(CloseAwareTitle(title: "Cube"))
-            .hidingTime()
         }
     }
 

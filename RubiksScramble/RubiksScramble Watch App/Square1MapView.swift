@@ -59,7 +59,6 @@ struct Square1MapView: View {
             .padding(.horizontal, 6)
             .padding(.bottom, 6)
             .modifier(CloseAwareTitle(title: "Square-1"))
-            .hidingTime()
         }
     }
 }
@@ -214,7 +213,6 @@ struct ClockMapView: View {
                 .frame(maxWidth: .infinity)
             }
             .modifier(CloseAwareTitle(title: "Clock"))
-            .hidingTime()
         }
     }
 

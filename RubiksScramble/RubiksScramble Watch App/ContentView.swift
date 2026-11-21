@@ -14,11 +14,8 @@ extension EnvironmentValues {
 struct CloseAwareTitle: ViewModifier {
     let title: String
     @Environment(\.closeShown) private var closeShown
-    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     func body(content: Content) -> some View {
-        // With "Hide time" on there is no title at all: a title is what makes
-        // watchOS draw the navigation bar (title + time).
-        content.navigationTitle(closeShown || hideTime ? "" : title)
+        content.navigationTitle(closeShown ? "" : title)
     }
 }
 
@@ -114,9 +111,9 @@ struct ContentView: View {
         } else if showTimer {
             TimerScreen(solves: $timerSolves)
         } else if showAo5 {
-            NavigationStack { Ao5Screen().hidingTime() }
+            NavigationStack { Ao5Screen() }
         } else if showCalibrate {
-            NavigationStack { CalibrateScreen().hidingTime() }
+            NavigationStack { CalibrateScreen() }
         } else if showInputLog {
             NavigationStack { InputLogScreen().toolbar { closeToolbar } }
         } else if showCustom {
@@ -809,15 +806,11 @@ private struct PuzzlePage: View {
             }
         }
         .tabViewStyle(.verticalPage)
-        // The vertical-page TabView hosts the pages' navigation bars itself, so
-        // the NavigationStacks inside the pages may not be the ones that count.
-        .hidingTime()
     }
 }
 
 private struct ScrambleScreen: View {
     let puzzle: Puzzle
-    @AppStorage(GeneralSettings.hideTimeKey) private var hideTime = GeneralSettings.defaultHideTime
     @Binding var lengths: [Puzzle: Int]
     @Binding var moves: [Puzzle: [String]]
     @State private var crownLength = Double(ScrambleGenerator.defaultLength)
@@ -915,12 +908,6 @@ private struct ScrambleScreen: View {
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 12) {
-                    // Nav bar (title + time) is hidden by "Hide time": keep the name in content.
-                    if hideTime {
-                        Text(puzzle.name)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
                     // 3×3: the standard WCA scrambling orientation, with the
                     // green pill + white text echoing the two reference faces.
                     // Square-1: how to read the notation.
@@ -1042,7 +1029,6 @@ private struct ScrambleScreen: View {
             .onChange(of: shakeTick) { regenerate(proxy) }
             }
             .modifier(CloseAwareTitle(title: puzzle.name))
-            .hidingTime()
         }
         // Swiping to the other puzzle shouldn't leave the crown bound here.
         .onDisappear { isSelected = false; shake.stop() }
