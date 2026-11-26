@@ -18,6 +18,10 @@ Inverse relations: `inverseOf` is the case whose picture the inverse of this
 case's alg produces (PLL: up to AUF, exactly; OLL / edge steps: up to U turns,
 same kind preferred), `inverseKind` is "self" when that is the case itself,
 otherwise "pair". `--write` (re)computes both fields into the JSON.
+COLL (kind "coll", 42 cases): the setup is the inverse of `alg`, edges are oriented,
+`alg` fixes the corners exactly and keeps F2L intact (edges may stay permuted); `pic`
+shows the corner orientation, `cp` the corner permutation; the 42 cases are pairwise
+distinct up to AUF (pre and post U turns), variants are pre-AUFs only.
 It cannot catch a valid alg filed under the wrong case number or name; that
 needs a human cross-check against a published table.
 """
@@ -100,6 +104,25 @@ def ll_only(c):
 
 TURNS = ('', 'U', 'U2', "U'")
 
+CORNER_KEYS = sorted(k for k in Cube().s if k[0][1] == 1 and k[0][0] != 0 and k[0][2] != 0)
+TOP_EDGES = [((0, 1, -1), UP), ((1, 1, 0), UP), ((0, 1, 1), UP), ((-1, 1, 0), UP)]
+
+def coll_class(seq):
+    """Corner state of `seq` on a solved cube, minimised over all 16 AUF pairs."""
+    best = None
+    for a in range(4):
+        for b in range(4):
+            c = Cube().apply('U ' * a + seq + ' ' + 'U ' * b)
+            k = tuple(c.s[x] for x in CORNER_KEYS)
+            if best is None or k < best: best = k
+    return best
+
+def coll_solved(c):
+    """COLL goal: F2L intact, top edges oriented, corners solved (edges may be permuted)."""
+    s = Cube().s
+    return (ll_only(c) and all(c.s[k] == 'U' for k in TOP_EDGES) and
+            all(c.s[k] == s[k] for k in CORNER_KEYS))
+
 
 def _state_key(c):
     return tuple(sorted(c.s.items()))
@@ -109,9 +132,12 @@ def inverse_map(cases):
     """id -> id of the case that the inverse of its alg looks like."""
     pll_states = {}
     oll_keys = {}
+    coll_keys = {}
     for o in cases:
         inv = invert(o['alg'])
-        if o['kind'] == 'pll':
+        if o['kind'] == 'coll':
+            coll_keys.setdefault(coll_class(inv), []).append(o['id'])
+        elif o['kind'] == 'pll':
             for a in TURNS:
                 for b in TURNS:
                     pll_states.setdefault(_state_key(Cube().apply(f'{a} {inv} {b}')), []).append(o['id'])
@@ -121,7 +147,10 @@ def inverse_map(cases):
             oll_keys.setdefault(key, []).append(o)
     out = {}
     for e in cases:
-        if e['kind'] == 'pll':
+        if e['kind'] == 'coll':
+            ids = coll_keys.get(coll_class(e['alg']), [])
+            out[e['id']] = ids[0] if ids else None
+        elif e['kind'] == 'pll':
             ids = pll_states.get(_state_key(Cube().apply(e['alg'])), [])
             out[e['id']] = ids[0] if ids else None
         else:
@@ -144,17 +173,33 @@ def main(path, write=False):
             json.dump(cases, f, separators=(',', ':'))
     bad, solved, seen_ids, classes = [], Cube().s, set(), {}
     top = [(p, UP) for p in LL]
-    counts = {'oll': 0, 'pll': 0, 'edge': 0}
+    counts = {'oll': 0, 'pll': 0, 'edge': 0, 'coll': 0}
+    coll_seen = {}
     for e in cases:
         cid = e['id']
+        is_coll = e['kind'] == 'coll'
         if cid in seen_ids: bad.append(f'{cid}: duplicate id')
         seen_ids.add(cid)
         counts[e['kind']] += 1
         if e['alg'] != e['solve']: bad.append(f'{cid}: alg != solve')
         base = Cube().apply(e['setup'])
         if not ll_only(base): bad.append(f'{cid}: setup disturbs F2L')
-        if base.copy().apply(e['solve']).s != solved: bad.append(f'{cid}: solve fails')
-        if e['kind'] in ('oll', 'edge'):
+        done = base.copy().apply(e['solve'])
+        if is_coll:
+            if not coll_solved(done): bad.append(f'{cid}: solve does not fix the corners')
+            if all(base.s[k] == Cube().s[k] for k in CORNER_KEYS): bad.append(f'{cid}: corners already solved')
+            if not all(base.s[k] == 'U' for k in TOP_EDGES): bad.append(f'{cid}: edges not oriented')
+            if oll_bits(base) != e['pic']: bad.append(f'{cid}: setup != pic')
+            if pll_perm(base)[0] != e['cp']: bad.append(f'{cid}: setup != cp')
+            if e['two_look']: bad.append(f'{cid}: two_look must be false')
+            if e['setup'] != invert(e['alg']): bad.append(f'{cid}: setup is not the inverse of alg')
+            key = coll_class(e['setup'])
+            if key in coll_seen: bad.append(f'{cid}: same case as {coll_seen[key]} up to AUF')
+            coll_seen[key] = cid
+        elif done.s != solved: bad.append(f'{cid}: solve fails')
+        if is_coll:
+            pass
+        elif e['kind'] in ('oll', 'edge'):
             if oll_bits(base) != e['pic']: bad.append(f'{cid}: setup != pic')
             r = rebuild_from_bits(e['pic']).apply(e['alg'])
             if e['kind'] == 'oll' and not all(r.s[k] == 'U' for k in top):
@@ -175,6 +220,11 @@ def main(path, write=False):
             c = Cube().apply(v['setup'])
             tag = f"{cid} {v['pre']}|{v['post']}"
             if not ll_only(c): bad.append(f'{tag}: F2L disturbed')
+            if is_coll:
+                if not coll_solved(c.copy().apply(v['solve'])): bad.append(f'{tag}: solve fails')
+                if oll_bits(c) != e['pic']: bad.append(f'{tag}: picture changed')
+                if pll_perm(c)[0] != v.get('cp'): bad.append(f'{tag}: cp mismatch')
+                continue
             if c.copy().apply(v['solve']).s != solved: bad.append(f'{tag}: solve fails')
             if e['kind'] == 'pll':
                 if pll_perm(c) != [v['cp'], v['ep']]: bad.append(f'{tag}: cp/ep mismatch')
@@ -188,7 +238,7 @@ def main(path, write=False):
         if e.get('inverseKind') != kind: bad.append(f"{e['id']}: inverseKind {e.get('inverseKind')} != {kind}")
         if e['kind'] == 'pll' and want in ids and inv_map.get(want) != e['id']:
             bad.append(f"{e['id']}: PLL inverse is not mutual")
-    if counts != {'oll': 57, 'pll': 21, 'edge': 3}: bad.append(f'unexpected counts {counts}')
+    if counts != {'oll': 57, 'pll': 21, 'edge': 3, 'coll': 42}: bad.append(f'unexpected counts {counts}')
     nv = sum(len(e['aufs']) for e in cases)
     print(f'{len(cases)} cases {counts}, {nv} AUF variants, {len(bad)} problems')
     for b in bad: print('  ', b)
