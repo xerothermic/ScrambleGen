@@ -24,10 +24,16 @@ enum AlgoArt {
             drawPLL(&context, origin: origin, side: side,
                     cp: variant?.cp ?? algoCase.cp ?? "0123",
                     ep: variant?.ep ?? algoCase.ep ?? "0123")
+        } else if algoCase.kind == "coll" {
+            drawOLL(&context, origin: origin, side: side, bits: algoCase.pic ?? "",
+                    cornerArrows: variant?.cp ?? algoCase.cp)
         } else {
             drawOLL(&context, origin: origin, side: side, bits: algoCase.pic ?? "")
         }
     }
+
+    /// Arrows over the COLL corner permutation: visible on yellow and on grey.
+    static let cornerInk = Color(red: 0.25, green: 0.78, blue: 1.0)
 
     private static func roundedRect(_ context: inout GraphicsContext, _ rect: CGRect,
                                     radius: CGFloat, color: Color) {
@@ -36,8 +42,10 @@ enum AlgoArt {
 
     /// bits: 9 top stickers (row-major, back row first), then back, right,
     /// front, left side stickers (3 each).
+    /// `cornerArrows` (COLL): corner permutation code like PLL's `cp`, drawn
+    /// as arrows between the corner cells.
     static func drawOLL(_ context: inout GraphicsContext, origin: CGPoint,
-                        side: CGFloat, bits: String) {
+                        side: CGFloat, bits: String, cornerArrows: String? = nil) {
         let b = Array(bits.utf8)
         guard b.count >= 21 else { return }
         let on: (Int) -> Color = { b[$0] == UInt8(ascii: "1") ? yellow : off }
@@ -68,6 +76,21 @@ enum AlgoArt {
             roundedRect(&context,
                         CGRect(x: x0 - gap * 1.5 - bar, y: y0 + o, width: bar, height: cell),
                         radius: bar * 0.3, color: on(18 + j))
+        }
+        guard let code = cornerArrows else { return }
+        let homes = code.compactMap { Int(String($0)) }
+        guard homes.count == 4 else { return }
+        func centre(_ slot: (Int, Int)) -> CGPoint {
+            CGPoint(x: x0 + CGFloat(slot.0) * (cell + gap) + cell / 2,
+                    y: y0 + CGFloat(slot.1) * (cell + gap) + cell / 2)
+        }
+        var done = Set<Int>()
+        for (i, h) in homes.enumerated() where h != i && !done.contains(i) {
+            let both = homes[h] == i
+            if both { done.insert(h) }
+            drawArrow(&context, from: centre(cornerSlots[i]), to: centre(cornerSlots[h]),
+                      width: max(1, side * 0.03), head: side * 0.11, both: both,
+                      ink: cornerInk)
         }
     }
 
@@ -103,7 +126,7 @@ enum AlgoArt {
     }
 
     static func drawArrow(_ context: inout GraphicsContext, from a: CGPoint, to b: CGPoint,
-                          width: CGFloat, head: CGFloat, both: Bool) {
+                          width: CGFloat, head: CGFloat, both: Bool, ink: Color = AlgoArt.arrowInk) {
         let dx = b.x - a.x, dy = b.y - a.y
         let len = (dx * dx + dy * dy).squareRoot()
         guard len > 0 else { return }
@@ -113,7 +136,7 @@ enum AlgoArt {
         var line = Path()
         line.move(to: start)
         line.addLine(to: end)
-        context.stroke(line, with: .color(arrowInk),
+        context.stroke(line, with: .color(ink),
                        style: StrokeStyle(lineWidth: width, lineCap: .butt))
         func tip(_ p: CGPoint, _ vx: CGFloat, _ vy: CGFloat) {
             let nx = -vy, ny = vx
@@ -124,7 +147,7 @@ enum AlgoArt {
             tri.addLine(to: CGPoint(x: p.x - vx * head - nx * head * 0.55,
                                     y: p.y - vy * head - ny * head * 0.55))
             tri.closeSubpath()
-            context.fill(tri, with: .color(arrowInk))
+            context.fill(tri, with: .color(ink))
         }
         tip(b, ux, uy)
         if both { tip(a, -ux, -uy) }

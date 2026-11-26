@@ -19,8 +19,8 @@ private func play(_ type: WKHapticType) {
 
 // MARK: Root menu
 
-/// The Algorithms card: mode menu (Drill, Practice, Learn, Quiz, Cases,
-/// Progress) plus the case-set filter.
+/// The Algorithms card: one row per algorithm type (OLL, PLL, COLL), then the
+/// modes (Practice, Drill, Learn, Quiz, Cases), the case-set filter and Progress.
 struct AlgoScreen: View {
     /// True while a sub-screen is open (Drill, Learn, ...). The card's floating
     /// close button and edge-swipe close then stand down, so the navigation
@@ -52,6 +52,24 @@ struct AlgoScreen: View {
         }
         // Same recipe as bigButton (Drill/Practice), whose taps work: a plain
         // style with an explicit hit shape, instead of the default list-row button.
+        .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
+    }
+
+    /// One row per algorithm type: tap sets the filter to that type and opens
+    /// its case list. Same Button + plain style + contentShape recipe.
+    private func typeButton(_ set: AlgoSet, _ symbol: String) -> some View {
+        Button {
+            filter = set
+            route = .cases
+            play(.click)
+        } label: {
+            menuRow(set.label, "\(set.cases(progress: store.progress).count) cases", symbol)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.12)))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
         .buttonStyle(.plain)
         .listRowBackground(Color.clear)
     }
@@ -94,8 +112,11 @@ struct AlgoScreen: View {
     var body: some View {
         NavigationStack {
             List {
-                bigButton(.drill, "Drill", "\(store.dueCount(in: cases)) due", "timer")
+                typeButton(.oll, "square.grid.3x3")
+                typeButton(.pll, "arrow.left.arrow.right")
+                typeButton(.coll, "square.grid.2x2")
                 bigButton(.practice, "Practice", "on your cube", "hand.tap")
+                bigButton(.drill, "Drill", "\(store.dueCount(in: cases)) due", "timer")
                 menuButton(.learn, "Learn", "\(cases.count) cases", "book")
                 menuButton(.quiz, "Quiz", "picture or name", "questionmark.circle")
                 menuButton(.cases, "Cases", "list", "list.bullet")
@@ -657,10 +678,10 @@ private struct AlgoQuizView: View {
 
     private func makeQuestion() {
         guard let target = cases.randomElement() else { question = nil; return }
-        let family = target.isPLL
-        var pool = cases.filter { $0.isPLL == family && $0.id != target.id }
+        let family = target.quizFamily
+        var pool = cases.filter { $0.quizFamily == family && $0.id != target.id }
         if pool.count < 3 {
-            pool = AlgoLibrary.all.filter { $0.isPLL == family && $0.id != target.id }
+            pool = AlgoLibrary.all.filter { $0.quizFamily == family && $0.id != target.id }
         }
         let options = ([target] + Array(pool.shuffled().prefix(3))).shuffled()
         question = Question(target: target, options: options, byPicture: Bool.random())
@@ -777,6 +798,7 @@ private struct AlgoProgressView: View {
     var body: some View {
         let oll = AlgoLibrary.all.filter { $0.kind == "oll" }
         let pll = AlgoLibrary.all.filter { $0.isPLL }
+        let coll = AlgoLibrary.all.filter { $0.isCOLL }
         let counts = (0...5).map { box in
             AlgoLibrary.all.filter { store.entry($0.id).box == box }.count
         }
@@ -785,6 +807,7 @@ private struct AlgoProgressView: View {
             VStack(spacing: 8) {
                 bar("OLL known", known(oll), oll.count)
                 bar("PLL known", known(pll), pll.count)
+                bar("COLL known", known(coll), coll.count)
                 HStack(spacing: 3) {
                     ForEach(1...5, id: \.self) { box in
                         VStack(spacing: 1) {

@@ -24,12 +24,12 @@ struct AlgoAuf: Decodable {
 /// (generated and verified by scripts/verify_algos.py).
 struct AlgoCase: Decodable, Identifiable {
     let id: String
-    let kind: String          // "oll", "pll" or "edge"
+    let kind: String          // "oll", "pll", "coll" or "edge"
     let name: String
     let mnemonic: String
     let alg: String
     let pic: String?          // OLL / edge: 21 chars of 0/1
-    let cp: String?           // PLL corner arrows
+    let cp: String?           // PLL / COLL corner arrows
     let ep: String?           // PLL edge arrows
     let desc: String?
     let twoLook: Bool
@@ -46,6 +46,11 @@ struct AlgoCase: Decodable, Identifiable {
     }
 
     var isPLL: Bool { kind == "pll" }
+    var isCOLL: Bool { kind == "coll" }
+
+    /// Quiz distractors come from the same family: PLL, COLL, or OLL (with
+    /// the edge-orientation steps).
+    var quizFamily: String { kind == "edge" ? "oll" : kind }
     var isSelfInverse: Bool { inverseKind == "self" }
 
     /// Second line under the name: the mnemonic, else the generated description.
@@ -82,7 +87,7 @@ enum AlgoLibrary {
 
 /// Case sets for the filter (stored in @AppStorage as the raw value).
 enum AlgoSet: String, CaseIterable, Identifiable {
-    case all, oll, pll, twoLookOLL, twoLookPLL, inversePairs, weak
+    case all, oll, pll, coll, twoLookOLL, twoLookPLL, inversePairs, weak
 
     var id: String { rawValue }
 
@@ -91,6 +96,7 @@ enum AlgoSet: String, CaseIterable, Identifiable {
         case .all: "All"
         case .oll: "OLL"
         case .pll: "PLL"
+        case .coll: "COLL"
         case .twoLookOLL: "2-look OLL"
         case .twoLookPLL: "2-look PLL"
         case .inversePairs: "Inverse pairs"
@@ -103,6 +109,7 @@ enum AlgoSet: String, CaseIterable, Identifiable {
         case .all: return true
         case .oll: return c.kind == "oll"
         case .pll: return c.isPLL
+        case .coll: return c.kind == "coll"
         case .twoLookOLL: return c.kind == "edge" || (c.kind == "oll" && c.twoLook)
         case .twoLookPLL: return c.isPLL && c.twoLook
         case .inversePairs: return AlgoLibrary.isMutualPair(c)

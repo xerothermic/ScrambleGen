@@ -414,7 +414,7 @@ private struct CardStack: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Algorithms")
                         .font(.system(size: 20, weight: .bold))
-                    Text("OLL · PLL practice")
+                    Text("OLL · PLL · COLL")
                         .font(.caption2)
                         .opacity(0.8)
                     Spacer()
