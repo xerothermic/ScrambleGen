@@ -51,10 +51,11 @@ permissions:
 jobs:
   testflight:
     name: Archive & upload
-    # macos-15 ships Xcode 16, whose watchOS SDK App Store Connect no
-    # longer accepts. macos-26 carries Xcode 26; pin a specific one with
-    # the XCODE_VERSION repository variable if the default drifts.
-    runs-on: macos-26
+    # ITMS-90725: from April 2027 uploads must be built with the iOS 27 SDK
+    # (Xcode 27+). The xcode-27 image carries Xcode 27.x (iOS + watchOS 27
+    # SDKs); macos-26 only has Xcode 26. Pin a specific one with the
+    # XCODE_VERSION repository variable (e.g. "27.2") if the default drifts.
+    runs-on: xcode-27
     timeout-minutes: 45
 
     env:
@@ -153,13 +154,21 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          # Pin by setting the XCODE_VERSION repository variable (e.g. "26.0")
+          # Pin by setting the XCODE_VERSION repository variable (e.g. "27.2")
           # when the runner's default drifts away from what the project needs.
           if [ -n "${{ vars.XCODE_VERSION }}" ]; then
             sudo xcode-select -s "/Applications/Xcode_${{ vars.XCODE_VERSION }}.app/Contents/Developer"
           fi
           xcode-select -p
           xcodebuild -version
+          # App Store Connect rejects builds made with an SDK older than 27
+          # (ITMS-90725), so stop here rather than after a 20-minute archive.
+          major=$(xcodebuild -version | awk '/^Xcode/{split($2,v,"."); print v[1]}')
+          if [ "$major" -lt 27 ]; then
+            echo "::error::Xcode $major selected; App Store uploads need Xcode 27+ (iOS 27 SDK)."
+            exit 1
+          fi
+          xcodebuild -showsdks | grep -Ei "iphoneos|watchos"
 
       # Some projects reference a gitignored xcconfig holding each developer's
       # DEVELOPMENT_TEAM. Xcode refuses to open the project when the file is
